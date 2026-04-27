@@ -4,18 +4,19 @@
  * Responsibilities:
  *  1. Connect to the node's WebSocket and register as a worker node
  *  2. Receive block assignments and dispatch them to the Web Worker thread
- *  3. Receive computed results from the Web Worker and send them back to coordinator
+ *  3. Receive computed results from the Web Worker and send them back
  *  4. Handle job submissions from the UI
  *  5. Display real-time metrics proving local computation
- *  6. Poll for results on reconnect (fault tolerance for disconnected clients)
+ *  6. Poll for results on reconnect (fault tolerance)
  */
 
 const App = (() => {
-  let ws          = null;
-  let workerId    = null;   // stable browser node ID (persisted in localStorage)
-  let webWorker   = null;   // Web Worker thread
-  let currentJobId= null;
-  const logs      = [];
+  let ws              = null;
+  let workerId        = null;
+  let webWorker       = null;
+  let currentJobId    = null;
+  let heartbeatTimer  = null;   // tracked to prevent stacking
+  const logs          = [];
 
   // ── Connection ─────────────────────────────────────────────────────────────
 
@@ -39,16 +40,17 @@ const App = (() => {
         device_type: "browser",
       }));
 
-      // Start the Web Worker compute thread
+      // Start the Web Worker compute thread (only once)
       if (!webWorker) {
         webWorker = new Worker("/static/worker.js");
         webWorker.onmessage = onWorkerResult;
         webWorker.onerror   = (e) => addLog("❌ Web Worker error: " + e.message);
       }
 
-      // Keepalive heartbeat every 2 seconds
-      setInterval(() => {
-        if (ws.readyState === WebSocket.OPEN) {
+      // Heartbeat — clear any old interval first to prevent stacking
+      if (heartbeatTimer) clearInterval(heartbeatTimer);
+      heartbeatTimer = setInterval(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ type: "heartbeat" }));
         }
       }, 2000);
@@ -75,11 +77,12 @@ const App = (() => {
       }
     };
 
-    ws.onerror = (e) => addLog("⚠️ WebSocket error");
+    ws.onerror = () => addLog("⚠️ WebSocket error");
 
     ws.onclose = () => {
       updateStatus("🔴 Disconnected — reconnecting in 3s...");
       addLog("⚠️ Connection lost. Retrying...");
+      // Don't clear metrics — keep last known state visible
       setTimeout(connect, 3000);
     };
   }
@@ -94,7 +97,6 @@ const App = (() => {
         break;
 
       case "assign_block":
-        // We received a block of rows to compute
         addLog(`📦 Block ${msg.block_id.slice(-8)} assigned — rows ${msg.row_start}–${msg.row_end - 1}`);
         updateMetric("status",     "⚙️ Computing...");
         updateMetric("last_block", msg.block_id.slice(-8));
@@ -102,13 +104,14 @@ const App = (() => {
 
         // Dispatch to Web Worker (background CPU thread)
         webWorker.postMessage({
-          type:      "assign_block",
-          job_id:    msg.job_id,
-          block_id:  msg.block_id,
-          row_start: msg.row_start,
-          row_end:   msg.row_end,
-          A_block:   msg.A_block,
-          B:         msg.B,
+          type:       "assign_block",
+          job_id:     msg.job_id,
+          block_id:   msg.block_id,
+          row_start:  msg.row_start,
+          row_end:    msg.row_end,
+          A_block:    msg.A_block,
+          B:          msg.B,
+          attempt_id: msg.attempt_id || 0,
         });
         break;
 
@@ -122,7 +125,10 @@ const App = (() => {
         break;
 
       case "heartbeat_ack":
-        // Silently acknowledge — no log spam
+        break;
+
+      case "error":
+        addLog("❌ Server error: " + (msg.message || "unknown"));
         break;
 
       default:
@@ -135,10 +141,17 @@ const App = (() => {
   function onWorkerResult(e) {
     const result = e.data;
 
+    // Handle errors from worker
+    if (result.type === "error") {
+      addLog("❌ Worker error: " + result.error);
+      updateMetric("status", "❌ Error");
+      return;
+    }
+
     // Add user_agent (not available inside Worker)
     result.metrics.user_agent = navigator.userAgent;
 
-    // Update metrics panel with proof of local computation
+    // Update metrics panel
     updateMetric("compute_time", result.metrics.compute_time_ms + " ms");
     updateMetric("mflops",       result.metrics.mflops.toFixed(4));
     updateMetric("operations",   result.metrics.total_operations.toLocaleString());
@@ -154,11 +167,12 @@ const App = (() => {
     // Send result back to coordinator via WebSocket
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({
-        type:      "block_result",
-        job_id:    result.job_id,
-        block_id:  result.block_id,
-        partial_C: result.partial_C,
-        metrics:   result.metrics,
+        type:       "block_result",
+        job_id:     result.job_id,
+        block_id:   result.block_id,
+        partial_C:  result.partial_C,
+        metrics:    result.metrics,
+        attempt_id: result.attempt_id || 0,
       }));
     }
   }
@@ -239,7 +253,6 @@ const App = (() => {
     }
 
     if (rows <= 12 && cols <= 12) {
-      // Show full matrix for small sizes
       html += `<div class="matrix-display">`;
       matrix.forEach(row => {
         html += `<div class="matrix-row">`;
@@ -250,7 +263,6 @@ const App = (() => {
       });
       html += `</div>`;
     } else {
-      // Large matrix — show corner preview + download
       html += `<p class="muted">Matrix too large to display inline (${rows}×${cols}). Showing top-left 6×6:</p>`;
       html += `<div class="matrix-display">`;
       for (let i = 0; i < Math.min(6, rows); i++) {
@@ -288,12 +300,26 @@ const App = (() => {
 
   // ── UI helpers ──────────────────────────────────────────────────────────────
 
+  let logFlushTimer = null;
+  let pendingLogs   = [];
+
   function addLog(msg) {
     const ts = new Date().toLocaleTimeString();
     logs.push(`[${ts}] ${msg}`);
     if (logs.length > 200) logs.shift();
-    const el = document.getElementById("log");
-    if (el) { el.textContent = logs.slice(-60).join("\n"); el.scrollTop = el.scrollHeight; }
+    pendingLogs.push(msg);
+    // Batch DOM updates to avoid lag during rapid messages
+    if (!logFlushTimer) {
+      logFlushTimer = setTimeout(() => {
+        const el = document.getElementById("log");
+        if (el) {
+          el.textContent = logs.slice(-60).join("\n");
+          el.scrollTop = el.scrollHeight;
+        }
+        pendingLogs = [];
+        logFlushTimer = null;
+      }, 50);
+    }
   }
 
   function updateStatus(s) {
