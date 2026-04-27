@@ -348,4 +348,4 @@ class Storage:
         if fn:
             await fn(data)
         else:
-            log.warning("Unknown sync operation: %s", operation)"""
+            log.warning("Unknown sync operation: %s", operation)
