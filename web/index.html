@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f172a" />
+    <link rel="manifest" href="/static/manifest.json" />
+    <title>DistMatMul</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <h1>⚡ DistMatMul</h1>
+        <span id="status" class="badge">Connecting...</span>
+      </header>
+
+      <!-- My Node Metrics Panel -->
+      <section class="card" id="metrics-panel">
+        <h2>My Node Contribution</h2>
+        <div class="metrics-grid">
+          <div class="metric">
+            <label>Status</label>
+            <span id="metric-status">Idle</span>
+          </div>
+          <div class="metric">
+            <label>Last Block</label>
+            <span id="metric-last_block">—</span>
+          </div>
+          <div class="metric">
+            <label>Compute Time</label>
+            <span id="metric-compute_time">—</span>
+          </div>
+          <div class="metric">
+            <label>MFLOPS</label>
+            <span id="metric-mflops">—</span>
+          </div>
+          <div class="metric">
+            <label>Operations</label>
+            <span id="metric-ops">—</span>
+          </div>
+          <div class="metric">
+            <label>Rows Processed</label>
+            <span id="metric-rows">—</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Matrix Input -->
+      <section class="card" id="input-panel">
+        <h2>Submit Matrix Job</h2>
+
+        <div class="matrix-inputs">
+          <div>
+            <label>Matrix A <small>(rows × cols)</small></label>
+            <div class="dim-row">
+              <input type="number" id="rowsA" value="3" min="2" max="200" /> ×
+              <input type="number" id="colsA" value="3" min="2" max="200" />
+            </div>
+            <button onclick="UI.buildGrid('A')">Generate Grid</button>
+            <div id="grid-A" class="matrix-grid"></div>
+          </div>
+
+          <div class="times-sign">×</div>
+
+          <div>
+            <label>Matrix B <small>(rows = cols of A)</small></label>
+            <div class="dim-row">
+              <input type="number" id="rowsB" value="3" min="2" max="200" /> ×
+              <input type="number" id="colsB" value="3" min="2" max="200" />
+            </div>
+            <button onclick="UI.buildGrid('B')">Generate Grid</button>
+            <div id="grid-B" class="matrix-grid"></div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="btn-primary" onclick="UI.submit()">
+            ▶ Run Distributed Multiply
+          </button>
+          <button onclick="UI.fillRandom()">🎲 Fill Random</button>
+          <button onclick="UI.fillLarge()">📐 Load 10×10 Random</button>
+        </div>
+
+        <div id="submit-result"></div>
+      </section>
+
+      <!-- Result -->
+      <section class="card">
+        <h2>Result</h2>
+        <div id="result-area"><p class="muted">No result yet.</p></div>
+      </section>
+
+      <!-- Log -->
+      <section class="card">
+        <h2>Node Log</h2>
+        <pre id="log" class="log-box">Waiting...</pre>
+      </section>
+    </div>
+
+    <script src="/static/app.js"></script>
+    <script>
+      // ── UI controller ──────────────────────────────────────────────────────
+      const UI = (() => {
+        function getMatrix(id) {
+          const grid = document.getElementById(`grid-${id}`);
+          if (!grid) return null;
+
+          const rows = grid.querySelectorAll(".matrix-row");
+          return Array.from(rows).map((row) =>
+            Array.from(row.querySelectorAll("input")).map(
+              (i) => parseFloat(i.value) || 0,
+            ),
+          );
+        }
+
+        function buildGrid(id) {
+          const rows = parseInt(document.getElementById(`rows${id}`).value);
+          const cols = parseInt(document.getElementById(`cols${id}`).value);
+          const grid = document.getElementById(`grid-${id}`);
+
+          grid.innerHTML = "";
+
+          if (rows > 20 || cols > 20) {
+            grid.innerHTML =
+              `<p class="muted">Grid too large to display (${rows}×${cols}). ` +
+              `Use "Fill Random" to populate and submit directly.</p>`;
+            return;
+          }
+
+          for (let r = 0; r < rows; r++) {
+            const row = document.createElement("div");
+            row.className = "matrix-row";
+
+            for (let c = 0; c < cols; c++) {
+              const inp = document.createElement("input");
+              inp.type = "number";
+              inp.value = "0";
+              inp.className = "cell-input";
+              row.appendChild(inp);
+            }
+
+            grid.appendChild(row);
+          }
+        }
+
+        function fillRandom() {
+          ["A", "B"].forEach((id) => {
+            document
+              .getElementById(`grid-${id}`)
+              .querySelectorAll("input")
+              .forEach((i) => {
+                i.value = (Math.random() * 10 - 5).toFixed(1);
+              });
+          });
+        }
+
+        function fillLarge() {
+          ["A", "B"].forEach((id) => {
+            document.getElementById(`rows${id}`).value = 10;
+            document.getElementById(`cols${id}`).value = 10;
+            buildGrid(id);
+          });
+
+          fillRandom();
+        }
+
+        async function submit() {
+          const A = getMatrix("A");
+          const B = getMatrix("B");
+
+          // For large matrices that couldn't be displayed as grids
+          if (!A || !B) {
+            const rA = parseInt(document.getElementById("rowsA").value);
+            const cA = parseInt(document.getElementById("colsA").value);
+            const rB = parseInt(document.getElementById("rowsB").value);
+            const cB = parseInt(document.getElementById("colsB").value);
+
+            const mA = Array.from({ length: rA }, () =>
+              Array.from(
+                { length: cA },
+                () => +(Math.random() * 10).toFixed(1),
+              ),
+            );
+            const mB = Array.from({ length: rB }, () =>
+              Array.from(
+                { length: cB },
+                () => +(Math.random() * 10).toFixed(1),
+              ),
+            );
+
+            const data = await App.submitJob(mA, mB);
+            document.getElementById("submit-result").textContent = data.job_id
+              ? `Job ${data.job_id.slice(0, 8)} running...`
+              : "Error: " + data.error;
+
+            if (data.job_id)
+              localStorage.setItem("matmul_last_job", data.job_id);
+            return;
+          }
+
+          const data = await App.submitJob(A, B);
+          document.getElementById("submit-result").textContent = data.job_id
+            ? `Job ${data.job_id.slice(0, 8)} running...`
+            : "Error: " + data.error;
+
+          if (data.job_id) localStorage.setItem("matmul_last_job", data.job_id);
+        }
+
+        // Build default grids on load
+        buildGrid("A");
+        buildGrid("B");
+
+        return { buildGrid, fillRandom, fillLarge, submit };
+      })();
+    </script>
+  </body>
+</html>
