@@ -4,8 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0f172a">
+  <meta name="description" content="Distributed matrix multiplication across phones and desktops on a local network.">
   <link rel="manifest" href="/static/manifest.json">
-  <title>DistMatMul</title>
+  <title>Distibuted Matrix</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -14,7 +15,7 @@
   <!-- Header -->
   <header>
     <div class="header-left">
-      <h1>⚡ DistMatMul</h1>
+      <h1>Distributed Matrix Multiplication</h1>
       <span class="subtitle">Distributed Matrix Multiplication</span>
     </div>
     <span id="conn-status" class="badge badge-connecting">Connecting...</span>
@@ -95,7 +96,7 @@
     </div>
 
     <div class="actions">
-      <button class="btn-primary" onclick="UI.submit()">▶ Run Distributed Multiply</button>
+      <button id="btn-run" class="btn-primary" onclick="UI.submit()">▶ Run Distributed Multiply</button>
       <button class="btn-secondary" onclick="UI.fillRandom()">🎲 Fill Random</button>
       <button class="btn-secondary" onclick="UI.setSize(5,5)">5×5</button>
       <button class="btn-secondary" onclick="UI.setSize(10,10)">10×10</button>
@@ -126,6 +127,7 @@
 <script>
 // ── UI Controller ─────────────────────────────────────────────────────────────
 const UI = (() => {
+  let isSubmitting = false;
 
   // Keep rows of B in sync with cols of A
   function syncDim() {
@@ -139,15 +141,16 @@ const UI = (() => {
     document.getElementById("rowsB").value = cols;
     document.getElementById("colsB").value = cols;
     syncDim();
+    clearFeedback();
     if (rows <= 12 && cols <= 12) {
       buildGrid("A");
       buildGrid("B");
       fillRandom();
     } else {
       document.getElementById("grid-A").innerHTML =
-        `<p class="muted grid-note">Grid hidden for ${rows}×${cols} — use "Fill Random" and submit directly.</p>`;
+        `<p class="muted grid-note">Grid hidden for ${rows}×${cols} — values auto-generated on submit.</p>`;
       document.getElementById("grid-B").innerHTML =
-        `<p class="muted grid-note">Grid hidden for ${rows}×${cols} — use "Fill Random" and submit directly.</p>`;
+        `<p class="muted grid-note">Grid hidden for ${rows}×${cols} — values auto-generated on submit.</p>`;
     }
   }
 
@@ -159,7 +162,7 @@ const UI = (() => {
 
     if (rows > 15 || cols > 15) {
       container.innerHTML =
-        `<p class="muted grid-note">Grid hidden (${rows}×${cols} too large to display). Values will be auto-generated on submit.</p>`;
+        `<p class="muted grid-note">Grid hidden (${rows}×${cols} too large). Values auto-generated on submit.</p>`;
       return;
     }
 
@@ -179,7 +182,7 @@ const UI = (() => {
   function getMatrix(id) {
     const container = document.getElementById(`grid-${id}`);
     const rows = container.querySelectorAll(".matrix-row");
-    if (!rows.length) return null;   // grid hidden — caller must generate random
+    if (!rows.length) return null;
     return Array.from(rows).map(row =>
       Array.from(row.querySelectorAll("input")).map(i => parseFloat(i.value) || 0)
     );
@@ -195,44 +198,70 @@ const UI = (() => {
   }
 
   function randomMatrix(rows, cols) {
+    // Raw numbers — no toFixed/parseFloat overhead for speed
     return Array.from({ length: rows }, () =>
-      Array.from({ length: cols }, () => parseFloat((Math.random() * 20 - 10).toFixed(2)))
+      Array.from({ length: cols }, () => Math.round((Math.random() * 20 - 10) * 100) / 100)
     );
   }
 
+  function clearFeedback() {
+    const fb = document.getElementById("submit-feedback");
+    if (fb) { fb.textContent = ""; fb.className = "submit-feedback"; }
+  }
+
   async function submit() {
+    if (isSubmitting) return;  // prevent double-clicks
+
     const rA = parseInt(document.getElementById("rowsA").value);
     const cA = parseInt(document.getElementById("colsA").value);
     const rB = parseInt(document.getElementById("rowsB").value);
     const cB = parseInt(document.getElementById("colsB").value);
 
+    // Enforce dimension sync
+    if (cA !== rB) {
+      document.getElementById("rowsB").value = cA;
+    }
+
     let A = getMatrix("A");
     let B = getMatrix("B");
 
-    // If grid was hidden (large matrix), generate random values
     if (!A) A = randomMatrix(rA, cA);
     if (!B) B = randomMatrix(rB, cB);
 
     const feedback = document.getElementById("submit-feedback");
+    const btn      = document.getElementById("btn-run");
 
     // Client-side dimension check
     if (A[0].length !== B.length) {
-      feedback.textContent = `❌ Dimension mismatch: A has ${A[0].length} columns, B has ${B.length} rows. They must match.`;
+      feedback.textContent = `❌ Dimension mismatch: A has ${A[0].length} columns, B has ${B.length} rows.`;
       feedback.className = "submit-feedback error";
       return;
     }
 
+    // Lock UI
+    isSubmitting = true;
+    btn.classList.add("is-loading");
+    btn.disabled = true;
     feedback.textContent = "⏳ Submitting job...";
     feedback.className = "submit-feedback info";
 
-    const data = await App.submitJob(A, B);
+    try {
+      const data = await App.submitJob(A, B);
 
-    if (data && data.job_id) {
-      feedback.textContent = `✅ Job ${data.job_id.slice(0, 8)} is running. Waiting for result...`;
-      feedback.className = "submit-feedback success";
-    } else if (data && data.error) {
-      feedback.textContent = `❌ ${data.error}`;
+      if (data && data.job_id) {
+        feedback.textContent = `✅ Job ${data.job_id.slice(0, 8)} is running. Waiting for result...`;
+        feedback.className = "submit-feedback success";
+      } else if (data && data.error) {
+        feedback.textContent = `❌ ${data.error}`;
+        feedback.className = "submit-feedback error";
+      }
+    } catch (e) {
+      feedback.textContent = `❌ Network error: ${e.message}`;
       feedback.className = "submit-feedback error";
+    } finally {
+      isSubmitting = false;
+      btn.classList.remove("is-loading");
+      btn.disabled = false;
     }
   }
 

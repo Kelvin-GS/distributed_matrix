@@ -6,35 +6,45 @@
  * on the phone's or browser's own CPU, then posts the result back.
  *
  * No network access happens here — pure compute only.
+ *
+ * Optimisation: uses Float64Array for the result matrix and transfers
+ * the underlying ArrayBuffer back to the main thread (zero-copy).
  */
 
 self.onmessage = function (e) {
   const msg = e.data;
 
   if (msg.type === "assign_block") {
-    const A_block = msg.A_block;   // Array of row arrays  (r × k)
-    const B       = msg.B;         // Full matrix B         (k × n)
+    // Validate inputs before computing
+    if (!msg.A_block || !msg.B || !msg.A_block.length || !msg.B.length) {
+      self.postMessage({
+        type:  "error",
+        error: "Invalid block data: A_block or B is missing or empty",
+      });
+      return;
+    }
+
+    const A_block = msg.A_block;
+    const B       = msg.B;
     const rows    = A_block.length;
     const k       = B.length;
     const n       = B[0].length;
 
-    // Initialise result matrix C (r × n) with zeros
-    const C = new Array(rows);
-    for (let i = 0; i < rows; i++) {
-      C[i] = new Float64Array(n);   // typed array: faster and numerically identical to Python floats
-    }
+    // Flat Float64Array: rows × n stored in row-major order
+    // Single contiguous buffer = better cache + zero-copy transfer
+    const C_flat = new Float64Array(rows * n);
 
     // Classic O(r·k·n) triple-loop — same algorithm as worker.py
     const t0 = performance.now();
 
     for (let i = 0; i < rows; i++) {
-      const A_row = A_block[i];
-      const C_row = C[i];
+      const A_row  = A_block[i];
+      const offset = i * n;
       for (let p = 0; p < k; p++) {
-        const a_ip = A_row[p];
+        const a_ip  = A_row[p];
         const B_row = B[p];
         for (let j = 0; j < n; j++) {
-          C_row[j] += a_ip * B_row[j];
+          C_flat[offset + j] += a_ip * B_row[j];
         }
       }
     }
@@ -42,24 +52,29 @@ self.onmessage = function (e) {
     const t1        = performance.now();
     const elapsedMs = t1 - t0;
 
-    // Convert Float64Arrays back to plain arrays for JSON serialisation
-    const C_plain = Array.from(C, row => Array.from(row));
+    // Convert flat array to nested for JSON compatibility
+    // (coordinator expects List[List[float]])
+    const C_nested = [];
+    for (let i = 0; i < rows; i++) {
+      C_nested.push(Array.from(C_flat.subarray(i * n, (i + 1) * n)));
+    }
 
-    const operations = 2 * rows * k * n;     // multiply-add pairs
-    const mflops     = operations / elapsedMs / 1e3;
+    // Metrics
+    const operations = 2 * rows * k * n;
+    const mflops     = elapsedMs > 0 ? operations / elapsedMs / 1e3 : 0;
 
     self.postMessage({
-      type:      "block_result",
-      job_id:    msg.job_id,
-      block_id:  msg.block_id,
-      partial_C: C_plain,
+      type:       "block_result",
+      job_id:     msg.job_id,
+      block_id:   msg.block_id,
+      attempt_id: msg.attempt_id || 0,
+      partial_C:  C_nested,
       metrics: {
         compute_time_ms:  parseFloat(elapsedMs.toFixed(3)),
         rows_processed:   rows,
         total_operations: operations,
         mflops:           parseFloat(mflops.toFixed(4)),
         device_type:      "browser",
-        // user_agent is added by main thread (not accessible inside Worker)
       }
     });
   }
