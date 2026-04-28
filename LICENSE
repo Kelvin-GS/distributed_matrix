@@ -1,0 +1,241 @@
+                    GNU AFFERO GENERAL PUBLIC LICENSE
+                       Version 3, 19 November 2007
+
+Distributed Matrix System
+Copyright (C) 2025 GUM KELVIN SIMON
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published
+by the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+===============================================================================
+
+TERMS AND CONDITIONS
+
+0. Definitions.
+
+"This License" refers to version 3 of the GNU Affero General Public License.
+
+"The Program" refers to the Distributed Matrix System and any associated
+source code, documentation, configuration files, and web interface files
+made available under this License.
+
+"Copyright Holder" refers to GUM KELVIN SIMON, the original author
+and sole copyright owner of the Program.
+
+"You" refers to any individual or legal entity exercising permissions
+granted by this License.
+
+"Modify" means to copy from or adapt all or part of the Program in a
+manner requiring copyright permission, other than making an exact copy.
+The resulting work is called a "modified version" of the earlier work.
+
+"Covered Work" means either the unmodified Program or a work based on
+the Program.
+
+"Propagate" means to do anything with the Program that, without
+permission, would make you directly or secondarily liable for infringement
+under applicable copyright law, except executing it on a computer or
+modifying a private copy.
+
+"Convey" means any kind of propagation that enables other parties to make
+or receive copies. Mere interaction with a user through a computer network,
+with no transfer of a copy, is not conveying.
+
+"Network Use" means operating the Program or a modified version of it on
+a server or infrastructure in such a way that other users can interact
+with it remotely through a computer network.
+
+===============================================================================
+
+1. ATTRIBUTION REQUIREMENT
+
+Any use, distribution, modification, or network deployment of this Program
+or any Covered Work must include clear and prominent attribution to the
+original author as follows:
+
+   "Built on the Distributed Matrix System, originally developed by
+    GUM KELVIN SIMON. Source available at:
+    https://github.com/Kelvin-GS/distributed matrix.git"
+
+This attribution must appear in:
+
+   a) Any documentation, README files, or user-facing materials
+      accompanying the Covered Work;
+
+   b) Any web interface, application UI, or publicly accessible front-end
+      through which end users interact with the Covered Work, in a location
+      that is reasonably visible to those users;
+
+   c) Any academic papers, technical reports, presentations, or publications
+      that describe, reference, or build upon the Program or a modified
+      version of it;
+
+   d) Any source code repository or version control system in which the
+      Covered Work or a modified version is hosted, in the repository's
+      primary README or equivalent landing document.
+
+Removing, obscuring, or misrepresenting the original authorship of this
+Program, in whole or in part, is a violation of this License.
+
+===============================================================================
+
+2. SOURCE CODE AND MODIFICATIONS MUST BE MADE PUBLIC
+
+If You modify this Program and:
+
+   a) distribute copies of the modified version to any third party, or
+
+   b) operate the modified version as a network service such that any
+      third party can interact with it remotely (including but not limited
+      to deploying it as a web application, API, or computing service),
+
+You must:
+
+   i)  Make the complete corresponding source code of the modified version
+       publicly available, under this same License, at no charge;
+
+   ii) Include all modifications, additions, and derivative files in the
+       publicly released source code — you may not withhold any part of
+       the modified work;
+
+   iii) Provide a clear, publicly accessible link to that source code in
+        any interface, documentation, or deployment through which users
+        access the modified version;
+
+   iv) Retain all existing copyright notices, license headers, and
+       attribution statements in all files, modified or unmodified.
+
+You may not impose any additional restrictions on the rights granted to
+recipients of the Covered Work beyond those stated in this License.
+
+===============================================================================
+
+3. NETWORK USE IS DISTRIBUTION
+
+For the avoidance of doubt, and consistent with Section 13 of the GNU
+Affero General Public License Version 3:
+
+If You operate this Program or any modified version of it as a service
+accessible over a computer network — including but not limited to running
+it as a hosted application, a cloud service, an API endpoint, or any
+form of software-as-a-service — that constitutes a form of distribution
+for the purposes of this License.
+
+You must therefore comply fully with Section 2 of this License, including
+making all source code of the modified version publicly available under
+these same terms.
+
+This clause exists specifically to prevent the practice of using this
+Program commercially as a network service while withholding modifications
+from the public.
+
+===============================================================================
+
+4. FUTURE COMMERCIAL USE BY THE COPYRIGHT HOLDER
+
+The Copyright Holder reserves the right to release future versions of this
+Program, or modified versions of it, under different licensing terms,
+including proprietary or commercial licenses, without this constituting a
+change to the terms under which prior versions were released.
+
+This means:
+
+   a) The Copyright Holder may, at any future point, offer commercial
+      licenses for use of this Program in proprietary products or services,
+      negotiated separately from this License;
+
+   b) Any such commercial arrangement does not affect your rights under
+      this License with respect to any version released under it;
+
+   c) If You wish to use this Program in a context that is incompatible
+      with the terms of this License — for example, in a closed-source
+      commercial product — You must obtain a separate written commercial
+      license directly from the Copyright Holder.
+
+To inquire about commercial licensing, contact: kelvingum289@gmail.com
+
+===============================================================================
+
+5. NO WARRANTY
+
+THIS PROGRAM IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
+
+IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES,
+OR OTHER LIABILITY — WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE
+— ARISING FROM, OUT OF, OR IN CONNECTION WITH THE PROGRAM OR THE USE OF
+OR OTHER DEALINGS IN THE PROGRAM.
+
+This includes but is not limited to:
+
+   - Data loss or corruption resulting from use of the Program;
+   - System failures, crashes, or downtime caused by the Program;
+   - Security vulnerabilities in the Program that affect your systems;
+   - Any consequential, incidental, or indirect damages of any kind.
+
+You assume full responsibility for determining the suitability of this
+Program for your intended use and for all risks associated with its
+operation.
+
+===============================================================================
+
+6. FEEDBACK AND ISSUE REPORTING
+
+While the Copyright Holder accepts no liability for issues arising from
+use of this Program, feedback, bug reports, and issue submissions are
+actively welcomed. Reports may be submitted via the project's public
+issue tracker at:
+
+   https://github.com/Kelvin-GS/distributed matrix/issues
+
+Submitting a bug report or feedback does not create any obligation on the
+part of the Copyright Holder to respond, fix, or maintain the Program,
+but all reports are read and taken seriously.
+
+===============================================================================
+
+7. ACCEPTANCE
+
+By using, copying, modifying, or distributing this Program or any Covered
+Work, You indicate your acceptance of, and agreement to be bound by, the
+terms and conditions of this License in full.
+
+If You do not agree to these terms, You are not permitted to use, copy,
+modify, or distribute the Program or any part of it.
+
+===============================================================================
+
+8. HOW TO APPLY THIS LICENSE TO YOUR MODIFICATIONS
+
+If You release a modified version of this Program, include the following
+notice at the top of each modified source file:
+
+   Distributed Matrix System — Modified Version
+   Original work Copyright (C) 2025 GUM KELVIN SIMON
+   Modifications Copyright (C) [YEAR] [YOUR NAME]
+
+   This file is part of a modified version of the Distributed Matrix System.
+   It is licensed under the GNU Affero General Public License v3.
+   See the LICENSE file or https://www.gnu.org/licenses/agpl-3.0.txt
+
+===============================================================================
+
+For the full text of the GNU Affero General Public License Version 3,
+see: https://www.gnu.org/licenses/agpl-3.0.txt
+
+The full AGPL v3 is incorporated into and forms part of this License.
+In the event of any conflict between the terms stated above and the
+standard AGPL v3 text, the terms stated above shall take precedence
+with respect to this Program.
+
+===============================================================================
+
+END OF LICENSE
