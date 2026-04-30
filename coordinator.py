@@ -67,9 +67,13 @@ class Coordinator:
         now    = time.time()
 
         # ── Choose backup nodes ────────────────────────────────────────────
+        # ONLY Python nodes (port > 0) can be backups — they receive
+        # state sync via HTTP POST. Browser nodes (port=0) cannot.
         nodes   = self._get_nodes()
-        backups = [n["node_id"] for n in nodes[:NUM_BACKUP_NODES]
-                   if n["node_id"] != self.node_id]
+        backups = [n["node_id"] for n in nodes
+                   if n["node_id"] != self.node_id
+                   and n.get("port", 0) != 0
+                   and n.get("device_type") != "browser"][:NUM_BACKUP_NODES]
 
         # ── Partition into row-blocks ──────────────────────────────────────
         workers       = [n for n in nodes if n["node_id"] != self.node_id]
@@ -92,7 +96,7 @@ class Coordinator:
         job_record = {
             "job_id":         job_id,
             "submitter_id":   submitter_id,
-            "status":         JobStatus.RUNNING,
+            "status":         JobStatus.PENDING,
             "matrix_A":       matrix_A,
             "matrix_B":       matrix_B,
             "rows_A":         rows_A,
@@ -107,6 +111,8 @@ class Coordinator:
 
         # ── Persist everything BEFORE any computation ──────────────────────
         await self._db.create_job(job_record)
+        # Transition PENDING → RUNNING (respects state machine)
+        await self._db.update_job_status(job_id, JobStatus.RUNNING)
         for b in blocks:
             await self._db.create_block(b)
 
@@ -114,8 +120,11 @@ class Coordinator:
         for b in blocks:
             await self._sync_to_backups("create_block", b, backups)
 
-        log.info("[Coord] Job %s — %d blocks across %d workers",
-                 job_id[:8], len(blocks), num_workers)
+        log.info("[Coord] Job %s — %d blocks across %d workers "
+                 "(%d python, %d browser)",
+                 job_id[:8], len(blocks), num_workers,
+                 sum(1 for n in workers if n.get("device_type") != "browser"),
+                 sum(1 for n in workers if n.get("device_type") == "browser"))
 
         self._active_jobs.add(job_id)
         asyncio.create_task(self._run_job(job_id, matrix_A, matrix_B,

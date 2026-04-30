@@ -3,9 +3,9 @@ mDNS-based zero-configuration node discovery using the zeroconf library.
 Every node announces itself on the LAN; every node listens for announcements.
 No central registry, no manual IP entry.
 
-Thread safety: zeroconf callbacks run in a background thread.
-All mutations to the main asyncio loop are dispatched via
-loop.call_soon_threadsafe() to prevent race conditions.
+AsyncServiceBrowser dispatches callbacks from the asyncio event loop,
+so we use AsyncServiceInfo.async_request() instead of the synchronous
+get_service_info() (which raises RuntimeError inside an event loop).
 """
 
 import asyncio
@@ -14,8 +14,8 @@ import socket
 import time
 from typing import Callable, Optional, Dict
 
-from zeroconf import ServiceInfo, Zeroconf, ServiceBrowser, ServiceListener
-from zeroconf.asyncio import AsyncZeroconf, AsyncServiceBrowser
+from zeroconf import ServiceInfo, ServiceListener
+from zeroconf.asyncio import AsyncZeroconf, AsyncServiceBrowser, AsyncServiceInfo
 
 from config import SERVICE_TYPE, NODE_PORT
 from models import NodeInfo
@@ -87,13 +87,11 @@ class NodeDiscovery:
     # ── Browse for peers ──────────────────────────────────────────────────────
 
     async def _browse(self) -> None:
-        loop = asyncio.get_running_loop()
         listener = _Listener(
             my_node_id = self.node_id,
             zc         = self._zc.zeroconf,
             on_found   = self.on_found,
             on_lost    = self.on_lost,
-            loop       = loop,
         )
         self._browser = AsyncServiceBrowser(
             self._zc.zeroconf, SERVICE_TYPE, listener
@@ -102,30 +100,67 @@ class NodeDiscovery:
 
 class _Listener(ServiceListener):
     """
-    Receives zeroconf callbacks on a background thread.
-    Dispatches node_found / node_lost to the asyncio event loop
-    thread-safely via loop.call_soon_threadsafe().
+    Receives zeroconf callbacks from the async event loop
+    (AsyncServiceBrowser dispatches on the loop thread).
+
+    add_service / update_service schedule an async coroutine that uses
+    AsyncServiceInfo.async_request() — the correct async API.
+    remove_service is synchronous and safe to call directly.
     """
-    def __init__(self, my_node_id, zc, on_found, on_lost, loop):
+    def __init__(self, my_node_id, zc, on_found, on_lost):
         self._my_id    = my_node_id
         self._zc       = zc
         self._found    = on_found
         self._lost     = on_lost
-        self._loop     = loop
         # Robust mapping: service_name → node_id (avoids string parsing)
         self._name_map: Dict[str, str] = {}
 
-    def _extract_ipv4(self, info: ServiceInfo) -> Optional[str]:
+    def _extract_ipv4(self, info) -> Optional[str]:
         """Safely extract the first IPv4 address, skipping IPv6."""
         for addr in info.addresses:
             if len(addr) == 4:   # IPv4 = 4 bytes
                 return socket.inet_ntoa(addr)
         return None
 
+    # ── Sync callbacks → async resolution ─────────────────────────────────────
+
     def add_service(self, zc, type_, name):
-        info = zc.get_service_info(type_, name)
-        if not info:
+        """Called by AsyncServiceBrowser from the event loop."""
+        asyncio.ensure_future(self._async_resolve(type_, name))
+
+    def update_service(self, zc, type_, name):
+        """Called by AsyncServiceBrowser from the event loop."""
+        asyncio.ensure_future(self._async_resolve(type_, name))
+
+    def remove_service(self, zc, type_, name):
+        """Synchronous — no network I/O needed."""
+        node_id = self._name_map.pop(name, None)
+        if not node_id:
+            # Fallback: parse from service name
+            node_id = name.replace(f".{type_}", "").strip(".")
+        log.info("Node left: %s", node_id[:8])
+        self._lost(node_id)
+
+    # ── Async resolution (replaces sync get_service_info) ─────────────────────
+
+    async def _async_resolve(self, type_: str, name: str) -> None:
+        """
+        Resolve service info using the async API.
+        This is the FIX for the RuntimeError: the old code called
+        zc.get_service_info() (sync) from inside the event loop,
+        which the zeroconf library rejects. AsyncServiceInfo.async_request()
+        is the correct way to resolve from an async context.
+        """
+        try:
+            info = AsyncServiceInfo(type_, name)
+            await info.async_request(self._zc, 3000)
+        except Exception as e:
+            log.debug("Failed to resolve service %s: %s", name[:20], e)
             return
+
+        if not info.addresses:
+            return
+
         props   = {k.decode(): v.decode() for k, v in info.properties.items()}
         node_id = props.get("node_id", "")
         if not node_id or node_id == self._my_id:
@@ -147,39 +182,5 @@ class _Listener(ServiceListener):
             last_seen = time.time(),
         )
         log.info("Discovered node: %s @ %s:%d", node_id[:8], ip, info.port)
-        # Thread-safe dispatch to asyncio loop
-        self._loop.call_soon_threadsafe(self._found, node)
-
-    def remove_service(self, zc, type_, name):
-        # Use the name_map for robust ID lookup instead of string parsing
-        node_id = self._name_map.pop(name, None)
-        if not node_id:
-            # Fallback: parse from service name
-            node_id = name.replace(f".{type_}", "").strip(".")
-        log.info("Node left: %s", node_id[:8])
-        self._loop.call_soon_threadsafe(self._lost, node_id)
-
-    def update_service(self, zc, type_, name):
-        """Re-resolve and update the existing node info."""
-        info = zc.get_service_info(type_, name)
-        if not info:
-            return
-        props   = {k.decode(): v.decode() for k, v in info.properties.items()}
-        node_id = props.get("node_id", "")
-        if not node_id or node_id == self._my_id:
-            return
-
-        ip = self._extract_ipv4(info)
-        if not ip:
-            return
-
-        self._name_map[name] = node_id
-        node = NodeInfo(
-            node_id   = node_id,
-            ip        = ip,
-            port      = info.port,
-            join_time = float(props.get("join_time", time.time())),
-            last_seen = time.time(),
-        )
-        log.debug("Updated node: %s @ %s:%d", node_id[:8], ip, info.port)
-        self._loop.call_soon_threadsafe(self._found, node)
+        # Already on the event loop — call directly (no call_soon_threadsafe)
+        self._found(node)

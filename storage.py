@@ -460,6 +460,7 @@ class Storage:
 
     async def cleanup_expired(self) -> None:
         now = time.time()
+        expired_ids = []
         async with self._lock:
             conn = self._conn()
             try:

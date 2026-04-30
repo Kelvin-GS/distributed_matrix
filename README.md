@@ -239,10 +239,13 @@ mDNS works natively on macOS through the built-in Bonjour service — no additio
 On a successful start on any platform you will see:
 
 ```
-2024-11-14 10:23:45 [node] INFO — Node a3f7c891 starting on 192.168.1.42:8080
-2024-11-14 10:23:45 [storage] INFO — SQLite initialised at ./matmul.db (WAL mode)
-2024-11-14 10:23:45 [discovery] INFO — Discovery started. Local IP: 192.168.1.42
-2024-11-14 10:23:45 [node] INFO — Web UI at http://192.168.1.42:8080
+2026-04-28 17:10:21,183 [node] INFO — Loaded persistent node_id: e802fef3
+2026-04-28 17:10:21,186 [storage] INFO — SQLite initialised at /home/kelvin/Desktop/distributed_matrix/matmul.db (WAL mode)
+2026-04-28 17:10:21,187 [main] INFO — Starting distributed matrix node on port 8080...
+2026-04-28 17:10:21,187 [node] INFO — Node e802fef3 starting on 192.168.0.108:8080
+2026-04-28 17:10:21,647 [discovery] INFO — Registered mDNS service: e802fef3-a299-49b8-8953-84e422c9eac2._matmul._tcp.local. (port 8080)
+2026-04-28 17:10:21,647 [discovery] INFO — Discovery started. Local IP: 192.168.0.108, port: 8080
+2026-04-28 17:10:21,670 [node] INFO — Web UI at http://192.168.0.108:8080
 ```
 
 The IP address shown is what other devices use to reach this node. Every device running the system is also serving the web interface on that address.
