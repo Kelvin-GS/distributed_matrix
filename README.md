@@ -118,8 +118,8 @@ Make sure Python 3.10+ is installed. On older Ubuntu versions (20.04 and below) 
 bash
 
 ```bash
-sudoapt update
-sudoaptinstall python3.11 python3.11-pip python3.11-venv -y
+sudo apt update
+sudo apt install python3.11 python3.11-pip python3.11-venv -y
 ```
 
 Then set up and run:
@@ -154,7 +154,7 @@ If it is not running:
 bash
 
 ```bash
-sudoaptinstall avahi-daemon -y
+sudo apt install avahi-daemon -y
 sudo systemctl enable --now avahi-daemon
 ```
 
