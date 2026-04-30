@@ -178,12 +178,15 @@ class Node:
 
     def get_active_nodes(self) -> list:
         """
-        Return all known nodes (peers + browser workers).
-        Filters by heartbeat recency to exclude stale nodes.
+        Return all known nodes (Python peers + browser workers).
+        Python peers come from mDNS discovery (_registry).
+        Browser workers come from WebSocket connections (_browser_sockets).
+        Both are merged into a single list for the coordinator.
         """
         now     = time.time()
         cutoff  = HEARTBEAT_TIMEOUT * 3
         result  = []
+        seen_ids = set()
 
         # Python peers from mDNS registry
         for ni in self._registry.values():
@@ -195,10 +198,14 @@ class Node:
                     "device_type": ni.device_type,
                     "last_seen":   ni.last_seen,
                 })
+                seen_ids.add(ni.node_id)
 
-        # Browser workers from WebSocket registry
-        for browser_id in self._browser_sockets:
-            if browser_id not in {n["node_id"] for n in result}:
+        # Browser/phone workers from WebSocket registry
+        # These connect via WebSocket, not HTTP — port=0 signals this.
+        # The coordinator MUST route work to these nodes via WebSocket,
+        # NOT via HTTP POST (which would silently fail on port=0).
+        for browser_id, ws in self._browser_sockets.items():
+            if browser_id not in seen_ids:
                 result.append({
                     "node_id":     browser_id,
                     "ip":          "ws",
@@ -206,6 +213,7 @@ class Node:
                     "device_type": "browser",
                     "last_seen":   now,
                 })
+                seen_ids.add(browser_id)
 
         return result
 
