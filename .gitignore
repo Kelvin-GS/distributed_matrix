@@ -7,3 +7,4 @@ matmul.db
 matmul.db-wal
 matmul.db-shm
 .node_id
+.node_id.*

@@ -17,7 +17,7 @@ from typing import Callable, Optional, Dict
 from zeroconf import ServiceInfo, ServiceListener
 from zeroconf.asyncio import AsyncZeroconf, AsyncServiceBrowser, AsyncServiceInfo
 
-from config import SERVICE_TYPE, NODE_PORT
+from config import SERVICE_TYPE
 from models import NodeInfo
 
 log = logging.getLogger("discovery")
@@ -47,7 +47,7 @@ class NodeDiscovery:
         self.on_lost       = on_node_lost
         self._zc: Optional[AsyncZeroconf] = None
         self._browser: Optional[AsyncServiceBrowser] = None
-        self._service_name = f"{node_id}.{SERVICE_TYPE}"
+        self._service_name = f"{node_id}-{port}.{SERVICE_TYPE}"
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -80,7 +80,7 @@ class NodeDiscovery:
                 b"join_time": str(time.time()).encode(),
             },
         )
-        await self._zc.async_register_service(info)
+        await self._zc.async_register_service(info, allow_name_change=True)
         log.info("Registered mDNS service: %s (port %d)",
                  self._service_name, self.port)
 
@@ -136,8 +136,12 @@ class _Listener(ServiceListener):
         """Synchronous — no network I/O needed."""
         node_id = self._name_map.pop(name, None)
         if not node_id:
-            # Fallback: parse from service name
-            node_id = name.replace(f".{type_}", "").strip(".")
+            # Fallback: parse from service name.
+            # Format: "{node_id}-{port}.{SERVICE_TYPE}"
+            raw = name.replace(f".{type_}", "").strip(".")
+            # Strip the trailing "-{port}" suffix to recover the node_id
+            dash_idx = raw.rfind("-")
+            node_id = raw[:dash_idx] if dash_idx > 0 else raw
         log.info("Node left: %s", node_id[:8])
         self._lost(node_id)
 

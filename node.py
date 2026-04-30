@@ -34,7 +34,7 @@ log = logging.getLogger("node")
 class Node:
     def __init__(self, port: int = NODE_PORT):
         self.port        = port
-        self.node_id     = self._load_or_create_id()
+        self.node_id     = self._load_or_create_id(port)
         self.local_ip    = get_local_ip()
         self.storage     = Storage()
         self._status     = NodeStatus.IDLE
@@ -74,17 +74,38 @@ class Node:
 
     # ── Node ID persistence ───────────────────────────────────────────────────
 
-    def _load_or_create_id(self) -> str:
-        if os.path.exists(NODE_ID_FILE):
-            with open(NODE_ID_FILE) as f:
+    def _load_or_create_id(self, port: int) -> str:
+        """Each port gets its own identity file so multiple local instances
+        never collide.  Falls back to the legacy .node_id if a port-specific
+        file doesn't exist yet (first run after upgrade)."""
+        id_file = f"{NODE_ID_FILE}.{port}"
+
+        # Try port-specific file first
+        if os.path.exists(id_file):
+            with open(id_file) as f:
                 nid = f.read().strip()
                 if nid:
                     log.info("Loaded persistent node_id: %s", nid[:8])
                     return nid
+
+        # Migrate from legacy .node_id if this is the default port
+        # and the legacy file exists (smooth upgrade path)
+        if port == NODE_PORT and os.path.exists(NODE_ID_FILE):
+            with open(NODE_ID_FILE) as f:
+                nid = f.read().strip()
+                if nid:
+                    # Copy to port-specific file
+                    with open(id_file, "w") as pf:
+                        pf.write(nid)
+                    log.info("Migrated legacy node_id to %s: %s",
+                             id_file, nid[:8])
+                    return nid
+
+        # Generate fresh ID
         nid = str(uuid.uuid4())
-        with open(NODE_ID_FILE, "w") as f:
+        with open(id_file, "w") as f:
             f.write(nid)
-        log.info("Created new node_id: %s", nid[:8])
+        log.info("Created new node_id: %s (file: %s)", nid[:8], id_file)
         return nid
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -96,19 +117,25 @@ class Node:
             timeout=aiohttp.ClientTimeout(total=10)
         )
 
-        # Register self in DB
-        await self.storage.upsert_node({
-            "node_id":    self.node_id,
-            "ip":         self.local_ip,
-            "port":       self.port,
-            "join_time":  time.time(),
-            "last_seen":  time.time(),
-            "device_type":"python",
-            "status":     NodeStatus.IDLE,
-        })
+        try:
+            # Register self in DB
+            await self.storage.upsert_node({
+                "node_id":    self.node_id,
+                "ip":         self.local_ip,
+                "port":       self.port,
+                "join_time":  time.time(),
+                "last_seen":  time.time(),
+                "device_type":"python",
+                "status":     NodeStatus.IDLE,
+            })
 
-        # Start background tasks (tracked for clean shutdown)
-        await self.discovery.start()
+            # Start background tasks (tracked for clean shutdown)
+            await self.discovery.start()
+        except Exception:
+            # Ensure session is closed on early startup failure
+            await self.shutdown()
+            raise
+
         self._tasks.append(asyncio.create_task(
             self._guarded_loop("heartbeat", self._heartbeat_tick, HEARTBEAT_INTERVAL)))
         self._tasks.append(asyncio.create_task(
