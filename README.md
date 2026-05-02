@@ -83,161 +83,200 @@ The interesting engineering is not the multiplication itself. It is everything a
 - Internet access is **not required** at any point
 
 ## Installation
-
+ 
 ### 1. Clone the repository
-
-bash
-
+ 
 ```bash
 git clone https://github.com/Kelvin-GS/distributed_matrix.git
 cd distributed_matrix
 ```
-
+ 
 ### 2. Install dependencies
-
-bash
-
+ 
 ```bash
 pip install -r requirements.txt
 ```
-
-| Package               | Purpose                                          |
-| --------------------- | ------------------------------------------------ |
-| `fastapi`           | HTTP REST API and WebSocket server               |
-| `uvicorn[standard]` | ASGI server that runs FastAPI                    |
-| `aiohttp`           | Async HTTP client for node-to-node communication |
-| `zeroconf`          | mDNS / Zeroconf for automatic node discovery     |
-| `websockets`        | WebSocket protocol support                       |
-
+ 
+| Package | Purpose |
+|---|---|
+| `fastapi` | HTTP REST API and WebSocket server |
+| `uvicorn[standard]` | ASGI server that runs FastAPI |
+| `aiohttp` | Async HTTP client for node-to-node communication |
+| `zeroconf` | mDNS / Zeroconf for automatic node discovery |
+| `websockets` | WebSocket protocol support |
+ 
 ### 3. Start the node
-
+ 
 #### Ubuntu / Debian
-
+ 
 Make sure Python 3.10+ is installed. On older Ubuntu versions (20.04 and below) the default Python may be 3.8 — upgrade it first:
-
-bash
-
+ 
 ```bash
 sudo apt update
 sudo apt install python3.11 python3.11-pip python3.11-venv -y
 ```
-
+ 
 Then set up and run:
-
-bash
-
+ 
 ```bash
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 python3 main.py
 ```
-
+ 
 If port 8080 is blocked by UFW (Ubuntu's firewall), open it:
-
-bash
-
+ 
 ```bash
 sudo ufw allow 8080
 ```
-
+ 
 mDNS on Ubuntu also requires Avahi running. Confirm it is active:
-
-bash
-
+ 
 ```bash
 sudo systemctl status avahi-daemon
 ```
-
+ 
 If it is not running:
-
-bash
-
+ 
 ```bash
 sudo apt install avahi-daemon -y
 sudo systemctl enable --now avahi-daemon
 ```
-
+ 
 ---
-
+ 
 #### Windows 10 / 11
-
+ 
 First confirm Python 3.10+ is installed by opening Command Prompt or PowerShell:
-
-powershell
-
+ 
 ```powershell
 python --version
 ```
-
-If Python is not installed, download it from [python.org](https://www.python.org/downloads/). During installation, make sure to check  **"Add Python to PATH"** .
-
+ 
+If Python is not installed, download it from [python.org](https://www.python.org/downloads/). During installation, make sure to check **"Add Python to PATH"**.
+ 
 Then in Command Prompt or PowerShell:
-
-powershell
-
+ 
 ```powershell
 python -m venv venv
 venv\Scripts\activate
 pip install -r requirements.txt
 python main.py
 ```
-
+ 
 **Firewall note:** Windows Defender Firewall will likely prompt you the first time the node starts, asking whether to allow Python on the network. Click **Allow Access** on both private and public networks. If the prompt never appeared and other nodes cannot reach this one, add the rule manually:
-
+ 
 ```
 Control Panel → Windows Defender Firewall → Advanced Settings
 → Inbound Rules → New Rule → Port → TCP → 8080 → Allow the connection
 ```
-
+ 
 **mDNS on Windows:** The `zeroconf` library uses Windows' built-in mDNS stack. No additional installation is required. If node discovery is not working, check that the **Bonjour** service is not disabled — it is installed by iTunes and some other Apple software and can conflict. If Bonjour is present and disabled, either enable it or uninstall it; the Python `zeroconf` library does not depend on it.
-
+ 
 ---
-
+ 
 #### macOS 12+
-
+ 
 macOS ships with Python 2.7 by default in older versions. Confirm you have 3.10+:
-
-bash
-
+ 
 ```bash
 python3 --version
 ```
-
+ 
 If not, install via Homebrew:
-
-bash
-
+ 
 ```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 brew install python@3.11
 ```
-
+ 
 Then set up and run:
-
-bash
-
+ 
 ```bash
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 python3 main.py
 ```
-
-**Firewall note:** macOS may show a prompt asking if you want to allow incoming connections to Python. Click  **Allow** . If the prompt does not appear and other nodes cannot reach this one, go to:
-
+ 
+**Firewall note:** macOS may show a prompt asking if you want to allow incoming connections to Python. Click **Allow**. If the prompt does not appear and other nodes cannot reach this one, go to:
+ 
 ```
 System Settings → Privacy & Security → Firewall → Firewall Options
 ```
-
+ 
 Add Python to the allowed applications list.
-
+ 
 mDNS works natively on macOS through the built-in Bonjour service — no additional setup required.
-
+ 
 ---
-
+ 
+#### Android (Termux) — Advanced
+ 
+Running a Python node directly on Android requires **Termux** (a Linux terminal emulator). This is optional — most users will run Android phones as browser-only workers (see "Adding a phone or tablet" below), which requires zero installation.
+ 
+If you want your Android device to run a full Python node as a worker:
+ 
+**1. Install Termux**
+ 
+Download from [F-Droid](https://f-droid.org/en/packages/com.termux/) (NOT Google Play — the Play Store version is outdated and broken).
+ 
+**2. Install Python and dependencies**
+ 
+```bash
+pkg update && pkg upgrade
+pkg install python git
+```
+ 
+**3. Clone the repository**
+ 
+```bash
+cd ~
+git clone https://github.com/Kelvin-GS/distributed_matrix.git
+cd distributed_matrix
+```
+ 
+**4. Fix the dependency conflict**
+ 
+FastAPI tries to install `orjson` (a fast JSON library) which requires Rust compilation. Rust builds fail on Termux because of Android API level detection issues. The fix: skip `orjson` and `ujson` — FastAPI falls back to Python's built-in `json` module (slightly slower but fully functional).
+ 
+Create a file called `requirements-android.txt`:
+ 
+```bash
+cat > requirements-android.txt << 'EOF'
+fastapi==0.111.0 --no-binary orjson,ujson
+uvicorn[standard]==0.29.0
+aiohttp==3.9.5
+zeroconf==0.132.2
+websockets==12.0
+EOF
+```
+ 
+Then install:
+ 
+```bash
+pip install -r requirements-android.txt
+```
+ 
+**5. Run the node**
+ 
+```bash
+python main.py
+```
+ 
+Termux nodes work identically to desktop Python nodes - they participate in mDNS discovery, receive block assignments, compute locally, and report results. The compute performance will be lower than a laptop (phones have slower CPUs) but the metrics panel proves the phone's CPU is doing real work.
+ 
+**Known Termux limitations:**
+ 
+- **Battery drain** — Python running in the background consumes battery quickly; keep the device plugged in during long jobs
+- **Network wakelock** — Termux may lose network access when the screen turns off; keep the screen on or use a wakelock app
+- **No firewall control** — Android does not expose port-level firewall settings; incoming connections work automatically on WiFi
+ 
+---
+ 
 On a successful start on any platform you will see:
-
+ 
 ```
 2026-04-28 17:10:21,183 [node] INFO — Loaded persistent node_id: e802fef3
 2026-04-28 17:10:21,186 [storage] INFO — SQLite initialised at /home/kelvin/Desktop/distributed_matrix/matmul.db (WAL mode)
@@ -247,44 +286,41 @@ On a successful start on any platform you will see:
 2026-04-28 17:10:21,647 [discovery] INFO — Discovery started. Local IP: 192.168.0.108, port: 8080
 2026-04-28 17:10:21,670 [node] INFO — Web UI at http://192.168.0.108:8080
 ```
-
+ 
 The IP address shown is what other devices use to reach this node. Every device running the system is also serving the web interface on that address.
-
+ 
 To run multiple nodes on the same machine (useful for local testing), open a separate terminal for each and specify different ports:
-
-bash
-
+ 
 ```bash
 python main.py --port 8080
 python main.py --port 8081
 python main.py --port 8082
 ```
-
+ 
 ---
-
+ 
 ## Adding Devices
-
+ 
 ### Adding another computer
-
+ 
 Clone the repository, install dependencies following the steps for your OS above, then run:
-
-bash
-
+ 
 ```bash
 # Ubuntu / macOS
 python3 main.py
-
+ 
 # Windows
 python main.py
 ```
-
+ 
 The new node is discovered automatically within ~500ms. No configuration changes are needed on any existing node.
 
-## Adding a phone or tablet
+## Adding a phone or tablet(This is reserved ONLY for IOS devices!!!)
+To add an android phone, follow the "Termux" steps above, but for IOS;
 
 1. Connect the device to the same WiFi network
 2. Open any Python node's IP address in the browser: `http://192.168.1.42:8080`
-3. **The device registers itself as a worker node immediately**
+3. **The device registers itself as a client NOT a worker, sadly! :(**
 
 That is all. The phone will receive block assignments, compute them in a background thread, and return results with timing metrics, exactly as a Python node does, just via the browser runtime instead.
 
