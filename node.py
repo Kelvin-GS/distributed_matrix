@@ -147,7 +147,9 @@ class Node:
         # Build and run FastAPI
         app = create_app(self)
         config = uvicorn.Config(app, host="0.0.0.0", port=self.port,
-                                log_level="warning")
+                                log_level="info",
+                                ws_ping_interval=20,   # keep mobile WS alive
+                                ws_ping_timeout=20)
         server = uvicorn.Server(config)
         log.info("Web UI at http://%s:%d", self.local_ip, self.port)
 

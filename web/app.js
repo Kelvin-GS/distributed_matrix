@@ -16,15 +16,36 @@ const App = (() => {
   let webWorker       = null;
   let currentJobId    = null;
   let heartbeatTimer  = null;   // tracked to prevent stacking
+  let reconnectDelay  = 1000;   // exponential backoff start (ms)
+  let reconnectAttempt = 0;
+  const MAX_RECONNECT = 30000;  // max 30s between retries
   const logs          = [];
 
   // ── Connection ─────────────────────────────────────────────────────────────
 
   function connect() {
+    // Build WebSocket URL from current page location
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
-    ws = new WebSocket(`${proto}//${location.host}/ws`);
+    const wsUrl = `${proto}//${location.host}/ws`;
+
+    // Show connection diagnostics so user knows what's happening
+    updateStatus("🟡 Connecting...");
+    addLog(`🔌 Connecting to ${wsUrl} (attempt ${reconnectAttempt + 1})...`);
+
+    try {
+      ws = new WebSocket(wsUrl);
+    } catch (e) {
+      addLog(`❌ WebSocket creation failed: ${e.message}`);
+      updateStatus("🔴 Connection failed");
+      scheduleReconnect();
+      return;
+    }
 
     ws.onopen = () => {
+      // Reset backoff on successful connection
+      reconnectDelay = 1000;
+      reconnectAttempt = 0;
+
       // Generate or restore a stable browser node ID
       workerId = localStorage.getItem("matmul_node_id");
       if (!workerId) {
@@ -42,9 +63,13 @@ const App = (() => {
 
       // Start the Web Worker compute thread (only once)
       if (!webWorker) {
-        webWorker = new Worker("/static/worker.js");
-        webWorker.onmessage = onWorkerResult;
-        webWorker.onerror   = (e) => addLog("❌ Web Worker error: " + e.message);
+        try {
+          webWorker = new Worker("/static/worker.js");
+          webWorker.onmessage = onWorkerResult;
+          webWorker.onerror   = (e) => addLog("❌ Web Worker error: " + e.message);
+        } catch (e) {
+          addLog("❌ Failed to start compute worker: " + e.message);
+        }
       }
 
       // Heartbeat — clear any old interval first to prevent stacking
@@ -56,7 +81,7 @@ const App = (() => {
       }, 2000);
 
       updateStatus("🟢 Connected");
-      addLog("✅ Connected as worker node " + workerId.slice(0, 12) + "...");
+      addLog("✅ Connected to server at " + location.host);
       updateMetric("node_id", workerId.slice(0, 12) + "...");
       updateMetric("device",  navigator.userAgent.slice(0, 40));
       updateMetric("status",  "Idle — ready");
@@ -77,14 +102,30 @@ const App = (() => {
       }
     };
 
-    ws.onerror = () => addLog("⚠️ WebSocket error");
-
-    ws.onclose = () => {
-      updateStatus("🔴 Disconnected — reconnecting in 3s...");
-      addLog("⚠️ Connection lost. Retrying...");
-      // Don't clear metrics — keep last known state visible
-      setTimeout(connect, 3000);
+    ws.onerror = (e) => {
+      addLog("⚠️ WebSocket error — check that the server is running on " + location.host);
     };
+
+    ws.onclose = (e) => {
+      if (heartbeatTimer) {
+        clearInterval(heartbeatTimer);
+        heartbeatTimer = null;
+      }
+      const reason = e.reason || `code ${e.code}`;
+      updateStatus("🔴 Disconnected");
+      addLog(`⚠️ Connection closed (${reason}). Reconnecting...`);
+      scheduleReconnect();
+    };
+  }
+
+  function scheduleReconnect() {
+    reconnectAttempt++;
+    const delay = Math.min(reconnectDelay, MAX_RECONNECT);
+    addLog(`🔄 Retry in ${(delay / 1000).toFixed(0)}s (attempt ${reconnectAttempt})...`);
+    updateStatus(`🔴 Reconnecting in ${(delay / 1000).toFixed(0)}s...`);
+    setTimeout(connect, delay);
+    // Exponential backoff: 1s → 2s → 4s → 8s → ... → 30s max
+    reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT);
   }
 
   // ── Message dispatcher ──────────────────────────────────────────────────────
@@ -93,7 +134,9 @@ const App = (() => {
     switch (msg.type) {
 
       case "registered":
-        addLog("🔗 Registered as worker node on this network");
+        addLog(`🔗 Registered as worker node on this network`);
+        addLog(`📡 Server: ${msg.server_id || "unknown"} | ${msg.total_nodes || "?"} node(s) active`);
+        updateMetric("status", "Idle — ready for work");
         break;
 
       case "assign_block":
@@ -103,16 +146,20 @@ const App = (() => {
         updateMetric("job_id",     msg.job_id.slice(0, 8) + "...");
 
         // Dispatch to Web Worker (background CPU thread)
-        webWorker.postMessage({
-          type:       "assign_block",
-          job_id:     msg.job_id,
-          block_id:   msg.block_id,
-          row_start:  msg.row_start,
-          row_end:    msg.row_end,
-          A_block:    msg.A_block,
-          B:          msg.B,
-          attempt_id: msg.attempt_id || 0,
-        });
+        if (webWorker) {
+          webWorker.postMessage({
+            type:       "assign_block",
+            job_id:     msg.job_id,
+            block_id:   msg.block_id,
+            row_start:  msg.row_start,
+            row_end:    msg.row_end,
+            A_block:    msg.A_block,
+            B:          msg.B,
+            attempt_id: msg.attempt_id || 0,
+          });
+        } else {
+          addLog("❌ No compute worker available — cannot process block");
+        }
         break;
 
       case "job_complete":
@@ -174,6 +221,9 @@ const App = (() => {
         metrics:    result.metrics,
         attempt_id: result.attempt_id || 0,
       }));
+      addLog(`📤 Result sent to coordinator for block ${result.block_id.slice(-8)}`);
+    } else {
+      addLog("⚠️ WebSocket not connected — result not sent!");
     }
   }
 
