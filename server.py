@@ -19,6 +19,7 @@ import time
 from typing import Dict, Set
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -36,6 +37,15 @@ def create_app(node) -> FastAPI:
     imports while keeping the server stateless about node internals.
     """
     app = FastAPI(title="DistMatMul Node")
+
+    # ── CORS — allow mobile browsers on the LAN to connect ────────────────
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     # ── Static web files ────────────────────────────────────────────────────
     if os.path.exists(WEB_DIR):
@@ -337,7 +347,8 @@ def create_app(node) -> FastAPI:
         await ws.accept()
         _ui_sockets.add(ws)
         browser_id = None
-        log.info("[WS] Browser connected")
+        client_ip = ws.client.host if ws.client else "unknown"
+        log.info("[WS] Browser connected from %s", client_ip)
 
         try:
             while True:
@@ -357,24 +368,31 @@ def create_app(node) -> FastAPI:
                     if "node_id" not in msg:
                         continue
                     browser_id = msg["node_id"]
+                    now = time.time()
                     node_info  = {
                         "node_id":    browser_id,
-                        "ip":         ws.client.host if ws.client else "unknown",
+                        "ip":         client_ip,
                         "port":       0,
                         "device_type":"browser",
-                        "join_time":  time.time(),
-                        "last_seen":  time.time(),
+                        "join_time":  now,
+                        "last_seen":  now,
                         "status":     "idle",
                     }
                     await node.storage.upsert_node(node_info)
                     node._browser_sockets[browser_id] = ws
+
+                    # Tell the phone it's registered + how many nodes are active
+                    active_nodes = node.get_active_nodes()
                     await ws.send_text(json.dumps({
-                        "type":    "registered",
-                        "node_id": browser_id,
-                        "your_ip": ws.client.host if ws.client else "unknown",
+                        "type":        "registered",
+                        "node_id":     browser_id,
+                        "your_ip":     client_ip,
+                        "server_id":   node.node_id[:12],
+                        "total_nodes": len(active_nodes) + 1,  # +1 = self
                     }))
-                    log.info("[WS] Browser worker registered: %s",
-                             browser_id[:8])
+                    log.info("[WS] Browser worker registered: %s from %s "
+                             "(%d active nodes)",
+                             browser_id[:8], client_ip, len(active_nodes) + 1)
 
                 elif mtype == "block_result":
                     # Validate required fields
@@ -386,6 +404,8 @@ def create_app(node) -> FastAPI:
                         continue
 
                     msg["worker_id"] = browser_id or "browser-unknown"
+                    log.info("[WS] Block result from browser %s for block %s",
+                             (browser_id or "?")[:8], msg["block_id"][:8])
                     await _route_to_coordinator(msg)
 
                 elif mtype == "subscribe_job":
@@ -394,13 +414,14 @@ def create_app(node) -> FastAPI:
                         _job_sockets.setdefault(job_id, set()).add(ws)
 
                 elif mtype == "heartbeat":
-                    # Update browser liveness
+                    # Update browser liveness in storage
                     if browser_id:
                         await node.storage.upsert_node({
                             "node_id": browser_id,
-                            "ip": ws.client.host if ws.client else "unknown",
+                            "ip": client_ip,
                             "port": 0,
                             "device_type": "browser",
+                            "join_time": time.time(),
                             "status": "idle",
                         })
                     await ws.send_text(json.dumps(

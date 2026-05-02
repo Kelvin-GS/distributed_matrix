@@ -60,7 +60,7 @@ class NodeDiscovery:
 
     async def stop(self) -> None:
         if self._browser:
-            self._browser.cancel()
+            await self._browser.async_cancel()
             self._browser = None
         if self._zc:
             await self._zc.async_unregister_all_services()

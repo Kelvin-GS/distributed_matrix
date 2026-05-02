@@ -294,9 +294,9 @@ class Storage:
                 conn.execute("""
                     UPDATE blocks SET status=?, worker_id=NULL,
                     assigned_at=NULL WHERE block_id=? AND job_id=?
-                    AND status=?
+                    AND status IN (?, ?)
                 """, (BlockStatus.PENDING, block_id, job_id,
-                      BlockStatus.ASSIGNED))
+                      BlockStatus.ASSIGNED, BlockStatus.FAILED))
                 conn.commit()
             finally:
                 conn.close()
