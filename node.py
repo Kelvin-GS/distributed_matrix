@@ -30,6 +30,11 @@ from server      import create_app
 
 log = logging.getLogger("node")
 
+# How long after startup before coordinator health checks run.
+# Prevents a newly joined node from declaring coordinators dead
+# before it has received a single heartbeat from them.
+STARTUP_GRACE = 30.0
+
 
 class Node:
     def __init__(self, port: int = NODE_PORT):
@@ -38,6 +43,7 @@ class Node:
         self.local_ip    = get_local_ip()
         self.storage     = Storage()
         self._status     = NodeStatus.IDLE
+        self._start_time = time.time()
 
         # Registry of known peer nodes: node_id → NodeInfo
         self._registry:         Dict[str, NodeInfo] = {}
@@ -302,6 +308,11 @@ class Node:
         Check if coordinators of running jobs are still alive.
         If a coordinator is unreachable, trigger a Bully election.
         """
+        uptime = time.time() - self._start_time
+        if uptime < STARTUP_GRACE:
+            log.debug("[Health] In startup grace period (%.0fs / %.0fs)",
+                      uptime, STARTUP_GRACE)
+            return
         running_jobs = await self.storage.get_running_jobs()
         for job in running_jobs:
             coord_id = job["coordinator_id"]

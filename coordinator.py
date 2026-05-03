@@ -181,18 +181,22 @@ class Coordinator:
 
             attempt_id = await self._db.assign_block(block_id, job_id,
                                                       self.node_id)
+            if attempt_id is None:
+                log.error("[Coord] assign_block returned None for %s",
+                          block_id[:8])
+                continue
             self._local_computing.add(block_id)
             try:
                 A_block    = A[block["row_start"]:block["row_end"]]
-                assignment = {
-                    "job_id":     job_id,
-                    "block_id":   block_id,
-                    "row_start":  block["row_start"],
-                    "row_end":    block["row_end"],
-                    "A_block":    A_block,
-                    "B":          B,
-                    "attempt_id": attempt_id,
-                }
+                assignment = make_assign_block(
+                    job_id=job_id,
+                    block_id=block_id,
+                    row_start=block["row_start"],
+                    row_end=block["row_end"],
+                    A_block=A_block,
+                    B=B,
+                    attempt_id=attempt_id,
+                )
                 result = await execute_block(assignment)
                 await self.receive_result(result, backups)
             except (WorkerError, Exception) as e:
@@ -214,6 +218,10 @@ class Coordinator:
         # Update DB first (atomic: DB knows who owns this block)
         attempt_id = await self._db.assign_block(block_id, job_id,
                                                   worker["node_id"])
+        if attempt_id is None:
+            log.error("[Coord] assign_block returned None for %s",
+                      block_id[:8])
+            return False
         await self._sync_to_backups("assign_block", {
             "block_id":  block_id,
             "job_id":    job_id,
@@ -280,17 +288,19 @@ class Coordinator:
                 A_block    = A[block["row_start"]:block["row_end"]]
                 attempt_id = await self._db.assign_block(block_id, job_id,
                                                           self.node_id)
+                if attempt_id is None:
+                    continue
                 self._local_computing.add(block_id)
                 try:
-                    assignment = {
-                        "job_id":     job_id,
-                        "block_id":   block_id,
-                        "row_start":  block["row_start"],
-                        "row_end":    block["row_end"],
-                        "A_block":    A_block,
-                        "B":          B,
-                        "attempt_id": attempt_id,
-                    }
+                    assignment = make_assign_block(
+                        job_id=job_id,
+                        block_id=block_id,
+                        row_start=block["row_start"],
+                        row_end=block["row_end"],
+                        A_block=A_block,
+                        B=B,
+                        attempt_id=attempt_id,
+                    )
                     result = await execute_block(assignment)
                     await self.receive_result(result, backups)
                 except (WorkerError, Exception) as e:

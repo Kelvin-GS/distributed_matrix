@@ -315,14 +315,24 @@ python main.py
  
 The new node is discovered automatically within ~500ms. No configuration changes are needed on any existing node.
 
-## Adding a phone or tablet(This is reserved ONLY for IOS devices!!!)
-To add an android phone, follow the "Termux" steps above, but for IOS;
+## Adding a phone or tablet
+
+Both Android and iPhone work as browser worker nodes — no installation required on either platform.
 
 1. Connect the device to the same WiFi network
-2. Open any Python node's IP address in the browser: `http://192.168.1.42:8080`
-3. **The device registers itself as a client NOT a worker, sadly! :(**
+2. Open any Python node's IP address in the browser: `http://192.168.x.x:8080`
+3. **The device registers itself as a worker node immediately**
 
-That is all. The phone will receive block assignments, compute them in a background thread, and return results with timing metrics, exactly as a Python node does, just via the browser runtime instead.
+The phone receives block assignments via WebSocket, computes them using a
+JavaScript Web Worker (a real background CPU thread), and returns results
+with timing metrics. The metrics panel on the phone confirms its CPU did
+the work.
+
+**Android:** Use Chrome or Firefox.
+**iPhone:** Use Safari (iOS 15+).
+
+> To run a full Python node on Android instead of a browser worker,
+> follow the Termux steps in the Installation section.
 
 ---
 

@@ -217,7 +217,7 @@ class Storage:
                 conn.close()
 
     async def assign_block(self, block_id: str, job_id: str,
-                           worker_id: str) -> int:
+                           worker_id: str) -> Optional[int]:
         """
         Assign block to a worker. Increments attempt_id.
         Returns the new attempt_id (used as a lease token).
@@ -230,7 +230,7 @@ class Storage:
                     (block_id, job_id)
                 ).fetchone()
                 if not row:
-                    return -1
+                    return None
                 new_attempt = row["attempt_id"] + 1
                 conn.execute("""
                     UPDATE blocks SET status=?, worker_id=?,
