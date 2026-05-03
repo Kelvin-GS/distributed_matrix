@@ -4,7 +4,7 @@
   "description": "Distributed matrix multiplication across phones and desktops on a local network.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#000000",
-  "theme_color": "#0a84ff",
+  "background_color": "#F7F5F1",
+  "theme_color": "#F7F5F1",
   "icons": []
 }
