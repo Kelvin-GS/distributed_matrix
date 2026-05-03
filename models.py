@@ -54,10 +54,11 @@ class NodeInfo:
     @staticmethod
     def from_dict(d: dict) -> "NodeInfo":
         """Construct from dict, ignoring unknown keys."""
-        known = {f.name for f in NodeInfo.__dataclass_fields__.values()}
+        known = {"node_id", "ip", "port", "join_time", "last_seen",
+                 "device_type", "status"}
         filtered = {k: v for k, v in d.items() if k in known}
-        _require("node_id" in filtered and "ip" in filtered,
-                 "NodeInfo requires at least node_id and ip")
+        if "port" not in filtered:
+            filtered["port"] = 0
         return NodeInfo(**filtered)
 
 

@@ -1,7 +1,9 @@
 .claude/
 venv/
+.venv/
 __pycache__/
 .env
+*.pyc
 
 matmul.db
 matmul.db-wal

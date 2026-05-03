@@ -1,10 +1,10 @@
 {
-  "name": "DistMatMul",
-  "short_name": "DistMatMul",
+  "name": "Distributed Matrix System",
+  "short_name": "DistMatrix",
   "description": "Distributed matrix multiplication across phones and desktops on a local network.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#000000",
-  "theme_color": "#000000",
+  "theme_color": "#0a84ff",
   "icons": []
 }
