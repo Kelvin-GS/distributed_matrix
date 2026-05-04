@@ -3,277 +3,752 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#0f172a">
+  <meta name="theme-color" content="#F7F5F1">
   <meta name="description" content="Distributed matrix multiplication across phones and desktops on a local network.">
   <link rel="manifest" href="/static/manifest.json">
   <title>Distributed Matrix System</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css?v=4">
 </head>
 <body>
-<div id="app">
-
-  <!-- Header -->
-  <header>
-    <div class="header-left">
-      <h1>Distributed Matrix System</h1>
-      <span class="subtitle">Peer-collaborative matrix multiplication over LAN</span>
-    </div>
-    <span id="conn-status" class="badge badge-connecting">Connecting...</span>
-  </header>
-
-  <!-- My Node Metrics Panel -->
-  <section class="card" id="metrics-panel">
-    <h2>My Node Contribution</h2>
-    <div class="metrics-grid">
-      <div class="metric">
-        <label>Node ID</label>
-        <span id="m-node_id">—</span>
-      </div>
-      <div class="metric">
-        <label>Status</label>
-        <span id="m-status">Connecting...</span>
-      </div>
-      <div class="metric">
-        <label>Current Job</label>
-        <span id="m-job_id">—</span>
-      </div>
-      <div class="metric">
-        <label>Last Block</label>
-        <span id="m-last_block">—</span>
-      </div>
-      <div class="metric">
-        <label>Compute Time</label>
-        <span id="m-compute_time">—</span>
-      </div>
-      <div class="metric">
-        <label>MFLOPS</label>
-        <span id="m-mflops">—</span>
-      </div>
-      <div class="metric">
-        <label>Operations</label>
-        <span id="m-operations">—</span>
-      </div>
-      <div class="metric">
-        <label>Rows Processed</label>
-        <span id="m-rows_done">—</span>
-      </div>
-    </div>
-    <div class="device-info">
-      <span id="m-device" class="device-tag">—</span>
-    </div>
-  </section>
-
-  <!-- Matrix Input Panel -->
-  <section class="card" id="input-panel">
-    <h2>Submit Matrix Job</h2>
-
-    <div class="matrix-section">
-      <!-- Matrix A -->
-      <div class="matrix-block">
-        <label class="matrix-label">Matrix A</label>
-        <div class="dim-controls">
-          <input type="number" id="rowsA" value="3" min="2" max="200" oninput="UI.syncDim()">
-          <span class="dim-sep">×</span>
-          <input type="number" id="colsA" value="3" min="2" max="200" oninput="UI.syncDim()">
-          <button class="btn-sm" onclick="UI.buildGrid('A')">Build Grid</button>
+  <div id="app" class="app-shell">
+    <header class="topbar">
+      <div>
+        <div class="brand-row">
+          <div class="brand-name">Distributed Matrix System</div>
         </div>
-        <div id="grid-A" class="matrix-grid"></div>
+        <div class="brand-subtitle">Peer-collaborative matrix multiplication on a local network</div>
       </div>
-
-      <div class="times-sign">×</div>
-
-      <!-- Matrix B -->
-      <div class="matrix-block">
-        <label class="matrix-label">Matrix B</label>
-        <div class="dim-controls">
-          <input type="number" id="rowsB" value="3" min="2" max="200" readonly>
-          <span class="dim-sep">×</span>
-          <input type="number" id="colsB" value="3" min="2" max="200" oninput="UI.buildGrid('B')">
-          <button class="btn-sm" onclick="UI.buildGrid('B')">Build Grid</button>
+      <div class="topbar-meta">
+        <div class="node-count-pill" aria-label="Active nodes">
+          <span id="node-count">—</span>
+          <span>nodes active</span>
         </div>
-        <div id="grid-B" class="matrix-grid"></div>
+        <div class="conn-pill">
+          <span class="conn-dot" aria-hidden="true"></span>
+          <span id="conn-status">Connecting...</span>
+        </div>
       </div>
-    </div>
+    </header>
 
-    <div class="actions">
-      <button id="btn-run" class="btn-primary" onclick="UI.submit()">▶ Run Distributed Multiply</button>
-      <button class="btn-secondary" onclick="UI.fillRandom()">🎲 Fill Random</button>
-      <button class="btn-secondary" onclick="UI.setSize(5,5)">5×5</button>
-      <button class="btn-secondary" onclick="UI.setSize(10,10)">10×10</button>
-      <button class="btn-secondary" onclick="UI.setSize(50,50)">50×50</button>
-      <button class="btn-secondary" onclick="UI.setSize(100,100)">100×100</button>
-    </div>
+    <section class="mobile-summary" aria-label="Your contribution">
+      <div class="ms-chip">
+        <span class="ms-label">Status</span>
+        <span class="ms-value" id="ms-status">Idle</span>
+      </div>
+      <div class="ms-chip">
+        <span class="ms-label">Compute</span>
+        <span class="ms-value" id="ms-compute">— ms</span>
+      </div>
+      <div class="ms-chip">
+        <span class="ms-label">MFLOPS</span>
+        <span class="ms-value" id="ms-mflops">—</span>
+      </div>
+    </section>
 
-    <div id="submit-feedback" class="submit-feedback"></div>
-  </section>
+    <section class="hero-strip" aria-label="Overview">
+      <div class="hero-copy">
+        <h1>Matrix Multiplication</h1>
+        <p>Every connected device contributes contributes it  part to the math!</p>
+      </div>
+      <div class="hero-stats">
+        <div class="stat">
+          <div class="stat-val" id="stat-last-job">—</div>
+          <div class="stat-label">Last job</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val stat-sky" id="stat-workers">—</div>
+          <div class="stat-label">Workers active</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val stat-honey" id="stat-jobs">—</div>
+          <div class="stat-label">Jobs run</div>
+        </div>
+      </div>
+    </section>
 
-  <!-- Result Panel -->
-  <section class="card">
-    <h2>Result</h2>
-    <div id="result-area">
-      <p class="muted">No result yet. Submit a job above.</p>
-    </div>
-  </section>
+    <main class="body">
+      <section class="left-column">
+        <div class="left-stack">
+        <div class="sect-label">Size presets</div>
+        <div class="preset-row" id="preset-row">
+          <button type="button" class="preset-btn active" data-size="2x2" onclick="UI.setSize(2, 2)">2<span class="x">×</span>2</button>
+          <button type="button" class="preset-btn" data-size="3x3" onclick="UI.setSize(3, 3)">3<span class="x">×</span>3</button>
+          <button type="button" class="preset-btn" data-size="4x4" onclick="UI.setSize(4, 4)">4<span class="x">×</span>4</button>
+          <button type="button" class="preset-btn" data-size="10x10" onclick="UI.setSize(10, 10)">10<span class="x">×</span>10</button>
+          <button type="button" class="preset-btn" data-size="50x50" onclick="UI.setSize(50, 50)">50<span class="x">×</span>50</button>
+          <button type="button" class="preset-btn" data-size="100x100" onclick="UI.setSize(100, 100)">100<span class="x">×</span>100</button>
+          <button type="button" class="preset-btn" data-size="custom" onclick="UI.markCustom()">Custom</button>
+        </div>
 
-  <!-- Log Panel -->
-  <section class="card">
-    <h2>Node Log</h2>
-    <pre id="log" class="log-box">Waiting for connection...</pre>
-  </section>
+        <section class="panel">
+          <div class="sect-label">Matrix input</div>
+          <div class="matrix-section">
+            <div class="matrix-block">
+              <div class="mat-header">
+                <span class="mat-letter">A</span>
+                <span class="dim-tag" id="dim-A-tag">2 × 2</span>
+              </div>
+              <div class="matrix-controls">
+                <label class="sr-only" for="rowsA">Rows A</label>
+                <input type="number" id="rowsA" class="dim-input" value="2" min="2" max="500" oninput="UI.onDimInput('rowsA');">
+                <span class="dim-sep">×</span>
+                <label class="sr-only" for="colsA">Cols A</label>
+                <input type="number" id="colsA" class="dim-input" value="2" min="2" max="500" oninput="UI.onDimInput('colsA');">
+              </div>
+              <div class="upload-row">
+                <input type="file" id="file-upload-A" class="sr-only" accept=".csv,text/csv" onchange="UI.uploadCsv('A', this)">
+                <label class="upload-btn" for="file-upload-A">Upload CSV</label>
+                <span class="upload-status" id="upload-status-A"></span>
+                <button type="button" class="upload-clear" onclick="UI.clearUpload('A')">Clear</button>
+              </div>
+              <div id="grid-A" class="mgrid mgrid-2"></div>
+            </div>
 
-</div><!-- /#app -->
+            <div class="op-sym">×</div>
 
-<script src="/static/app.js"></script>
-<script>
-// ── UI Controller ─────────────────────────────────────────────────────────────
-const UI = (() => {
-  let isSubmitting = false;
+            <div class="matrix-block">
+              <div class="mat-header">
+                <span class="mat-letter">B</span>
+                <span class="dim-tag" id="dim-B-tag">2 × 2</span>
+              </div>
+              <div class="matrix-controls">
+                <label class="sr-only" for="rowsB">Rows B</label>
+                <input type="number" id="rowsB" class="dim-input" value="2" min="2" max="500" readonly>
+                <span class="dim-sep">×</span>
+                <label class="sr-only" for="colsB">Cols B</label>
+                <input type="number" id="colsB" class="dim-input" value="2" min="2" max="500" oninput="UI.onDimInput('colsB');">
+              </div>
+              <div class="upload-row">
+                <input type="file" id="file-upload-B" class="sr-only" accept=".csv,text/csv" onchange="UI.uploadCsv('B', this)">
+                <label class="upload-btn" for="file-upload-B">Upload CSV</label>
+                <span class="upload-status" id="upload-status-B"></span>
+                <button type="button" class="upload-clear" onclick="UI.clearUpload('B')">Clear</button>
+              </div>
+              <div id="grid-B" class="mgrid mgrid-2"></div>
+            </div>
+          </div>
 
-  // Keep rows of B in sync with cols of A
-  function syncDim() {
-    const colsA = parseInt(document.getElementById("colsA").value) || 3;
-    document.getElementById("rowsB").value = colsA;
-  }
+          <div class="aux-row">
+            <button type="button" class="aux-btn" onclick="UI.fillRandom()">🎲 Fill Random</button>
+          </div>
 
-  function setSize(rows, cols) {
-    document.getElementById("rowsA").value = rows;
-    document.getElementById("colsA").value = cols;
-    document.getElementById("rowsB").value = cols;
-    document.getElementById("colsB").value = cols;
-    syncDim();
-    clearFeedback();
-    if (rows <= 12 && cols <= 12) {
-      buildGrid("A");
-      buildGrid("B");
-      fillRandom();
-    } else {
-      document.getElementById("grid-A").innerHTML =
-        `<p class="muted grid-note">Grid hidden for ${rows}×${cols} — values auto-generated on submit.</p>`;
-      document.getElementById("grid-B").innerHTML =
-        `<p class="muted grid-note">Grid hidden for ${rows}×${cols} — values auto-generated on submit.</p>`;
-    }
-  }
+          <div class="run-btn-row">
+            <button id="btn-run" type="button" class="run-btn" onclick="UI.submit()">Run Distributed Multiply</button>
+          </div>
+          <div id="submit-feedback" class="submit-feedback"></div>
+        </section>
 
-  function buildGrid(id) {
-    const rows = parseInt(document.getElementById(`rows${id}`).value) || 3;
-    const cols = parseInt(document.getElementById(`cols${id}`).value) || 3;
-    const container = document.getElementById(`grid-${id}`);
-    container.innerHTML = "";
+        <section class="panel result-panel">
+          <div class="sect-label">Result</div>
+          <div id="result-area" class="result-area">
+            <div class="result-empty">No result yet. Submit a job above.</div>
+          </div>
+        </section>
 
-    if (rows > 15 || cols > 15) {
-      container.innerHTML =
-        `<p class="muted grid-note">Grid hidden (${rows}×${cols} too large). Values auto-generated on submit.</p>`;
-      return;
-    }
+        <section class="panel log-panel">
+          <div class="sect-label">Node log</div>
+          <div id="log" class="log-area">Waiting for connection...</div>
+        </section>
+        </div>
+      </section>
 
-    for (let r = 0; r < rows; r++) {
-      const rowEl = document.createElement("div");
-      rowEl.className = "matrix-row";
-      for (let c = 0; c < cols; c++) {
-        const inp = document.createElement("input");
-        inp.type = "number"; inp.value = "0"; inp.className = "cell-input";
-        inp.step = "0.1";
-        rowEl.appendChild(inp);
+      <aside class="right-panel">
+        <div class="metric-card">
+          <div class="metric-val" id="m-compute_time">—</div>
+          <div class="metric-unit">Compute time (ms)</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-val metric-val-sky" id="m-mflops">—</div>
+          <div class="metric-unit">MFLOPS</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-val metric-val-honey" id="m-operations">—</div>
+          <div class="metric-unit">Operations executed</div>
+        </div>
+
+        <div class="supp-grid" aria-label="Node metrics">
+          <div class="supp-chip">
+            <span class="supp-label">Node ID</span>
+            <span class="supp-value" id="m-node_id">—</span>
+          </div>
+          <div class="supp-chip">
+            <span class="supp-label">Status</span>
+            <span class="supp-value" id="m-status">Connecting...</span>
+          </div>
+          <div class="supp-chip">
+            <span class="supp-label">Job ID</span>
+            <span class="supp-value" id="m-job_id">—</span>
+          </div>
+          <div class="supp-chip">
+            <span class="supp-label">Last block</span>
+            <span class="supp-value" id="m-last_block">—</span>
+          </div>
+          <div class="supp-chip">
+            <span class="supp-label">Rows done</span>
+            <span class="supp-value" id="m-rows_done">—</span>
+          </div>
+          <div class="supp-chip">
+            <span class="supp-label">Device</span>
+            <span class="supp-value" id="m-device">—</span>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="sect-label">Active nodes</div>
+        <div class="node-list">
+          <div class="node-row">
+            <div class="node-main">
+              <div class="node-icon py">PY</div>
+              <div>
+                <div class="node-name">Coordinator plane</div>
+                <div class="node-sub">Python node and shared storage</div>
+              </div>
+            </div>
+            <div class="node-meta">
+              <div class="node-pct">100%</div>
+              <div class="node-rows">orchestration</div>
+            </div>
+          </div>
+          <div class="node-row">
+            <div class="node-main">
+              <div class="node-icon py">PY</div>
+              <div>
+                <div class="node-name">Desktop workers</div>
+                <div class="node-sub">Python compute nodes</div>
+              </div>
+            </div>
+            <div class="node-meta">
+              <div class="node-pct">—</div>
+              <div class="node-rows">ready</div>
+            </div>
+          </div>
+          <div class="node-row">
+            <div class="node-main">
+              <div class="node-icon mob">JS</div>
+              <div>
+                <div class="node-name">Browser workers</div>
+                <div class="node-sub">Phones and tablets</div>
+              </div>
+            </div>
+            <div class="node-meta">
+              <div class="node-pct">—</div>
+              <div class="node-rows">ready</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="sect-label">Job progress</div>
+        <div class="progress-label">
+          <span>Live progress</span>
+          <span id="progress-text">Idle</span>
+        </div>
+        <div class="prog-track" aria-hidden="true">
+          <div id="prog-fill" class="prog-fill" style="width: 0%"></div>
+        </div>
+        <div class="footer-note">Result persists 2 hrs · <span id="footer-job-id">—</span></div>
+      </aside>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-left">
+        <div class="footer-item">Node <b id="footer-node-id">—</b></div>
+        <div class="footer-item" id="footer-addr">—</div>
+        <div class="footer-item" id="footer-coord">Coordinator for 0 jobs</div>
+      </div>
+      <div class="footer-right">Distributed Matrix System</div>
+    </footer>
+  </div>
+
+  <script>
+    // Unregister any service workers and clear caches to ensure updated assets are fetched
+    (function(){
+      try {
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function(regs){
+            regs.forEach(function(r){ try { r.unregister(); } catch(e){} });
+          }).catch(function(){});
+        }
+        if (window.caches) {
+          caches.keys().then(function(keys){ keys.forEach(function(k){ try { caches.delete(k); } catch(e){} }); }).catch(function(){});
+        }
+      } catch (e) {
+        // ignore
       }
-      container.appendChild(rowEl);
+    })();
+  </script>
+  <script src="/static/app.js?v=4"></script>
+  <script>
+    if (typeof App !== "undefined") {
+      window.App = App;
     }
-  }
+  </script>
+  <script>
+    const UI = (() => {
+      const presetButtons = () => Array.from(document.querySelectorAll(".preset-btn"));
+      const presetMap = new Map([
+        ["2x2", "2×2"],
+        ["3x3", "3×3"],
+        ["4x4", "4×4"],
+        ["10x10", "10×10"],
+        ["50x50", "50×50"],
+        ["100x100", "100×100"],
+      ]);
 
-  function getMatrix(id) {
-    const container = document.getElementById(`grid-${id}`);
-    const rows = container.querySelectorAll(".matrix-row");
-    if (!rows.length) return null;
-    return Array.from(rows).map(row =>
-      Array.from(row.querySelectorAll("input")).map(i => parseFloat(i.value) || 0)
-    );
-  }
+      let isSubmitting = false;
+      const uploaded = { A: null, B: null };
+      const MIN_DIM = 2;
+      const MAX_DIM = 500;
 
-  function fillRandom() {
-    ["A", "B"].forEach(id => {
-      const inputs = document.getElementById(`grid-${id}`).querySelectorAll("input");
-      inputs.forEach(inp => {
-        inp.value = (Math.random() * 20 - 10).toFixed(2);
+      function escapeHtml(value) {
+        return String(value)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/\"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function setActivePreset(sizeKey) {
+        presetButtons().forEach((btn) => {
+          const isActive = btn.dataset.size === sizeKey;
+          btn.classList.toggle("active", isActive);
+        });
+      }
+
+      function markCustom() {
+        setActivePreset("custom");
+      }
+
+      function clearUploadedAll() {
+        uploaded.A = null;
+        uploaded.B = null;
+        clearUploadRow("A");
+        clearUploadRow("B");
+      }
+
+      function clearUploadRow(id) {
+        const inp = document.getElementById(`file-upload-${id}`);
+        if (inp) inp.value = "";
+        const st = document.getElementById(`upload-status-${id}`);
+        if (st) st.textContent = "";
+      }
+
+      function parseCsvText(text) {
+        const lines = text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0);
+        if (!lines.length) throw new Error("CSV is empty.");
+        const matrix = [];
+        let cols = null;
+        for (let i = 0; i < lines.length; i++) {
+          const parts = lines[i].split(",").map((p) => p.trim());
+          if (cols === null) cols = parts.length;
+          else if (parts.length !== cols) {
+            throw new Error(`Row ${i + 1} has ${parts.length} columns; expected ${cols}.`);
+          }
+          const row = [];
+          for (let j = 0; j < parts.length; j++) {
+            const v = parseFloat(parts[j]);
+            if (!Number.isFinite(v)) throw new Error(`Invalid number at row ${i + 1}, col ${j + 1}.`);
+            row.push(v);
+          }
+          matrix.push(row);
+        }
+        const rows = matrix.length;
+        if (rows < MIN_DIM || rows > MAX_DIM) throw new Error(`Row count ${rows} must be between ${MIN_DIM} and ${MAX_DIM}.`);
+        if (cols < MIN_DIM || cols > MAX_DIM) throw new Error(`Column count ${cols} must be between ${MIN_DIM} and ${MAX_DIM}.`);
+        return matrix;
+      }
+
+      function uploadCsv(id, inputEl) {
+        const file = inputEl.files && inputEl.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function () {
+          try {
+            const matrix = parseCsvText(String(reader.result || ""));
+            const parsedRows = matrix.length;
+            const parsedCols = matrix[0].length;
+
+            if (id === "A" && uploaded.B) {
+              if (parsedCols !== uploaded.B.length) {
+                setFeedback(
+                  `A has ${parsedCols} columns but uploaded B has ${uploaded.B.length} rows. cols(A) must equal rows(B). Clear B or upload a matching A.`,
+                  "error"
+                );
+                inputEl.value = "";
+                return;
+              }
+            }
+            if (id === "B") {
+              const colsA = uploaded.A ? uploaded.A[0].length : (parseInt(document.getElementById("colsA").value, 10) || 2);
+              if (parsedRows !== colsA) {
+                setFeedback(
+                  `B has ${parsedRows} rows but A has ${colsA} columns. cols(A) must equal rows(B). Adjust A first or upload a matching B.`,
+                  "error"
+                );
+                inputEl.value = "";
+                return;
+              }
+            }
+
+            uploaded[id] = matrix;
+            document.getElementById(`rows${id}`).value = String(parsedRows);
+            document.getElementById(`cols${id}`).value = String(parsedCols);
+            if (id === "A") {
+              syncDim();
+              rebuild("A");
+            } else {
+              rebuild("B");
+            }
+            updateDimTags();
+            const st = document.getElementById(`upload-status-${id}`);
+            if (st) st.textContent = `Loaded ${parsedRows}×${parsedCols} from ${file.name}`;
+            clearFeedback();
+          } catch (e) {
+            setFeedback(`CSV (${id}): ${e.message}`, "error");
+            inputEl.value = "";
+          }
+        };
+        reader.onerror = function () {
+          setFeedback(`Could not read file for matrix ${id}.`, "error");
+          inputEl.value = "";
+        };
+        reader.readAsText(file);
+      }
+
+      function clearUpload(id) {
+        uploaded[id] = null;
+        clearUploadRow(id);
+        rebuild(id);
+        updateDimTags();
+      }
+
+      function onDimInput(which) {
+        clearUploadedAll();
+        markCustom();
+        if (which === "rowsA") {
+          rebuild("A");
+        } else if (which === "colsA") {
+          syncDim();
+          rebuild("A");
+        } else if (which === "colsB") {
+          rebuild("B");
+        }
+      }
+
+      function updateDimTags() {
+        const rowsA = parseInt(document.getElementById("rowsA").value, 10) || 2;
+        const colsA = parseInt(document.getElementById("colsA").value, 10) || 2;
+        const rowsB = parseInt(document.getElementById("rowsB").value, 10) || 2;
+        const colsB = parseInt(document.getElementById("colsB").value, 10) || 2;
+        document.getElementById("dim-A-tag").textContent = `${rowsA} × ${colsA}`;
+        document.getElementById("dim-B-tag").textContent = `${rowsB} × ${colsB}`;
+        updateGridClass("A", rowsA, colsA);
+        updateGridClass("B", rowsB, colsB);
+      }
+
+      function updateGridClass(id, rows, cols) {
+        const container = document.getElementById(`grid-${id}`);
+        if (!container) return;
+        container.style.gridTemplateColumns = `repeat(${cols}, 46px)`;
+      }
+
+      function syncDim(markCustom = true) {
+        const colsA = parseInt(document.getElementById("colsA").value, 10) || 2;
+        document.getElementById("rowsB").value = colsA;
+        updateDimTags();
+        rebuild("B");
+        if (markCustom) {
+          setActivePreset("custom");
+        }
+        mirrorFooter();
+      }
+
+      function setSize(rows, cols) {
+        clearUploadedAll();
+        document.getElementById("rowsA").value = rows;
+        document.getElementById("colsA").value = cols;
+        document.getElementById("rowsB").value = cols;
+        document.getElementById("colsB").value = cols;
+        setActivePreset(`${rows}x${cols}`);
+        clearFeedback();
+        rebuild("A");
+        rebuild("B");
+        updateDimTags();
+        if (rows <= 12 && cols <= 12) {
+          fillRandom();
+        }
+      }
+
+      function buildGrid(id) {
+        rebuild(id);
+      }
+
+      function rebuild(id) {
+        const rows = parseInt(document.getElementById(`rows${id}`).value, 10) || 2;
+        const cols = parseInt(document.getElementById(`cols${id}`).value, 10) || 2;
+        const container = document.getElementById(`grid-${id}`);
+        if (!container) return;
+        container.innerHTML = "";
+        updateGridClass(id, rows, cols);
+
+        if (rows > 15 || cols > 15) {
+          container.innerHTML = `<p class="grid-note">Grid hidden for large matrices — use <strong>Upload CSV</strong> above, or values are auto-generated on submit if no CSV is loaded.</p>`;
+          return;
+        }
+
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const input = document.createElement("input");
+            input.type = "number";
+            input.value = "0";
+            input.step = "0.1";
+            input.className = `mcell${id === 'B' ? ' sky' : ''}`;
+            input.setAttribute("aria-label", `Matrix ${id} row ${r + 1} column ${c + 1}`);
+            if (id === "A") {
+              input.addEventListener("focus", () => input.classList.add("active"));
+              input.addEventListener("blur", () => input.classList.remove("active"));
+            }
+            container.appendChild(input);
+          }
+        }
+      }
+
+      function getMatrix(id) {
+        const container = document.getElementById(`grid-${id}`);
+        if (!container) return null;
+        const inputs = Array.from(container.querySelectorAll("input"));
+        if (!inputs.length) return null;
+        const rows = parseInt(document.getElementById(`rows${id}`).value, 10) || 2;
+        const cols = parseInt(document.getElementById(`cols${id}`).value, 10) || 2;
+        const matrix = [];
+        for (let r = 0; r < rows; r++) {
+          const row = [];
+          for (let c = 0; c < cols; c++) {
+            const cell = inputs[r * cols + c];
+            row.push(parseFloat(cell ? cell.value : "0") || 0);
+          }
+          matrix.push(row);
+        }
+        return matrix;
+      }
+
+      function fillRandom() {
+        clearUploadedAll();
+        ["A", "B"].forEach((id) => {
+          const inputs = document.querySelectorAll(`#grid-${id} input`);
+          inputs.forEach((input) => {
+            input.value = (Math.random() * 20 - 10).toFixed(2);
+          });
+        });
+        clearFeedback();
+      }
+
+      function randomMatrix(rows, cols) {
+        return Array.from({ length: rows }, () =>
+          Array.from({ length: cols }, () => Math.round((Math.random() * 20 - 10) * 100) / 100)
+        );
+      }
+
+      function clearFeedback() {
+        const fb = document.getElementById("submit-feedback");
+        if (fb) {
+          fb.textContent = "";
+          fb.className = "submit-feedback";
+        }
+      }
+
+      function setFeedback(message, kind) {
+        const fb = document.getElementById("submit-feedback");
+        if (!fb) return;
+        fb.textContent = message;
+        fb.className = `submit-feedback ${kind}`;
+      }
+
+      function updateProgress(percent, label) {
+        const fill = document.getElementById("prog-fill");
+        const text = document.getElementById("progress-text");
+        if (fill) fill.style.width = `${Math.max(0, Math.min(100, percent))}%`;
+        if (text) text.textContent = label;
+      }
+
+      function mirrorFooter() {
+        const nodeId = document.getElementById("m-node_id");
+        const jobId = document.getElementById("m-job_id");
+        const footerNode = document.getElementById("footer-node-id");
+        const footerJob = document.getElementById("footer-job-id");
+        const coord = document.getElementById("footer-coord");
+        if (nodeId && footerNode) footerNode.textContent = nodeId.textContent || "—";
+        if (jobId && footerJob) footerJob.textContent = jobId.textContent || "—";
+        if (coord) {
+          const count = parseInt(localStorage.getItem("matmul_jobs_run") || "0", 10);
+          coord.textContent = `Coordinator for ${count} jobs`;
+        }
+        const addr = document.getElementById("footer-addr");
+        if (addr) addr.textContent = location.host;
+      }
+
+      function syncHeroFromLog() {
+        const logEl = document.getElementById("log");
+        if (!logEl) return;
+        const text = logEl.textContent || "";
+        const lines = text.split("\n").filter(Boolean);
+        let workers = null;
+        let duration = null;
+        let jobs = parseInt(localStorage.getItem("matmul_jobs_run") || "0", 10);
+
+        for (const line of lines) {
+          const plain = line.replace(/^\[[^\]]+\]\s*/, "");
+          const workerMatch = plain.match(/(\d+) node\(s\) active/i);
+          if (workerMatch) workers = workerMatch[1];
+          const completeMatch = plain.match(/Job\s+([a-zA-Z0-9-]+)\s+complete\s+—\s+([0-9.]+)ms total/i);
+          if (completeMatch) {
+            duration = `${parseFloat(completeMatch[2]).toFixed(0)}ms`;
+            jobs = Math.max(jobs, parseInt(localStorage.getItem("matmul_jobs_run") || "0", 10));
+          }
+        }
+
+        if (workers != null) document.getElementById("stat-workers").textContent = workers;
+        if (duration != null) document.getElementById("stat-last-job").textContent = duration;
+        document.getElementById("stat-jobs").textContent = String(jobs);
+        mirrorFooter();
+      }
+
+      let isFormattingLog = false;
+
+      function formatLogPanel() {
+        const el = document.getElementById("log");
+        if (!el || isFormattingLog) return;
+        const raw = el.textContent || "";
+        if (!raw.trim()) return;
+        const lines = raw.split("\n").filter(Boolean);
+        isFormattingLog = true;
+        el.innerHTML = lines.map((line) => {
+          const match = line.match(/^\[(.*?)\]\s*(.*)$/);
+          const ts = match ? match[1] : "";
+          const msg = match ? match[2] : line;
+          let cls = "log-muted";
+          if (/connected|registered|idle/i.test(msg)) cls = "log-vir";
+          if (/submitted|assign|browser worker|worker/i.test(msg)) cls = "log-sky";
+          if (/complete|downloaded|result received/i.test(msg)) cls = "log-warm";
+          if (/error|failed|disconnected|warning|could not/i.test(msg)) cls = "log-muted";
+          return `<div class="log-line"><span class="log-time">${escapeHtml(ts)}</span><span class="${cls}">${escapeHtml(msg)}</span></div>`;
+        }).join("");
+        el.scrollTop = el.scrollHeight;
+        requestAnimationFrame(() => {
+          isFormattingLog = false;
+        });
+      }
+
+      function observePanel(id, callback) {
+        const target = document.getElementById(id);
+        if (!target) return;
+        const observer = new MutationObserver(() => callback());
+        observer.observe(target, { childList: true, characterData: true, subtree: true });
+      }
+
+      async function submit() {
+        if (isSubmitting) return;
+
+        const rowsA = parseInt(document.getElementById("rowsA").value, 10) || 2;
+        const colsA = parseInt(document.getElementById("colsA").value, 10) || 2;
+        const rowsB = parseInt(document.getElementById("rowsB").value, 10) || 2;
+        const colsB = parseInt(document.getElementById("colsB").value, 10) || 2;
+
+        if (colsA !== rowsB) {
+          document.getElementById("rowsB").value = colsA;
+        }
+
+        let A = uploaded.A || getMatrix("A");
+        let B = uploaded.B || getMatrix("B");
+        if (!A) A = randomMatrix(rowsA, colsA);
+        if (!B) B = randomMatrix(rowsB, colsB);
+
+        if (uploaded.A) {
+          document.getElementById("rowsA").value = String(A.length);
+          document.getElementById("colsA").value = String(A[0].length);
+          document.getElementById("rowsB").value = String(A[0].length);
+        }
+        if (uploaded.B) {
+          document.getElementById("rowsB").value = String(B.length);
+          document.getElementById("colsB").value = String(B[0].length);
+        }
+
+        if (A[0].length !== B.length) {
+          setFeedback(`Dimension mismatch: A has ${A[0].length} columns, B has ${B.length} rows. cols(A) must equal rows(B).`, "error");
+          updateProgress(0, "Dimension mismatch");
+          return;
+        }
+
+        const btn = document.getElementById("btn-run");
+        isSubmitting = true;
+        if (btn) {
+          btn.classList.add("is-loading");
+          btn.disabled = true;
+        }
+        setFeedback("⏳ Submitting job...", "info");
+        updateProgress(18, "Submitting");
+
+        try {
+          const data = await App.submitJob(A, B);
+          if (data && data.job_id) {
+            const count = parseInt(localStorage.getItem("matmul_jobs_run") || "0", 10) + 1;
+            localStorage.setItem("matmul_jobs_run", String(count));
+            document.getElementById("stat-jobs").textContent = String(count);
+            mirrorFooter();
+            setFeedback(`✅ Job ${data.job_id.slice(0, 8)} is running. Waiting for result...`, "success");
+            updateProgress(45, "Job submitted");
+          } else if (data && data.error) {
+            setFeedback(`❌ ${data.error}`, "error");
+            updateProgress(0, "Submission error");
+          }
+        } catch (e) {
+          setFeedback(`❌ Network error: ${e.message}`, "error");
+          updateProgress(0, "Network error");
+        } finally {
+          isSubmitting = false;
+          if (btn) {
+            btn.classList.remove("is-loading");
+            btn.disabled = false;
+          }
+        }
+      }
+
+      window.addEventListener("DOMContentLoaded", () => {
+        rebuild("A");
+        rebuild("B");
+        syncDim(false);
+        updateProgress(0, "Idle");
+        mirrorFooter();
+        observePanel("log", () => {
+          formatLogPanel();
+          syncHeroFromLog();
+        });
+        observePanel("m-node_id", mirrorFooter);
+        observePanel("m-job_id", mirrorFooter);
+        observePanel("m-status", mirrorFooter);
+        setTimeout(() => {
+          formatLogPanel();
+          syncHeroFromLog();
+          mirrorFooter();
+        }, 0);
       });
-    });
-  }
 
-  function randomMatrix(rows, cols) {
-    // Raw numbers — no toFixed/parseFloat overhead for speed
-    return Array.from({ length: rows }, () =>
-      Array.from({ length: cols }, () => Math.round((Math.random() * 20 - 10) * 100) / 100)
-    );
-  }
-
-  function clearFeedback() {
-    const fb = document.getElementById("submit-feedback");
-    if (fb) { fb.textContent = ""; fb.className = "submit-feedback"; }
-  }
-
-  async function submit() {
-    if (isSubmitting) return;  // prevent double-clicks
-
-    const rA = parseInt(document.getElementById("rowsA").value);
-    const cA = parseInt(document.getElementById("colsA").value);
-    const rB = parseInt(document.getElementById("rowsB").value);
-    const cB = parseInt(document.getElementById("colsB").value);
-
-    // Enforce dimension sync
-    if (cA !== rB) {
-      document.getElementById("rowsB").value = cA;
-    }
-
-    let A = getMatrix("A");
-    let B = getMatrix("B");
-
-    if (!A) A = randomMatrix(rA, cA);
-    if (!B) B = randomMatrix(rB, cB);
-
-    const feedback = document.getElementById("submit-feedback");
-    const btn      = document.getElementById("btn-run");
-
-    // Client-side dimension check
-    if (A[0].length !== B.length) {
-      feedback.textContent = `❌ Dimension mismatch: A has ${A[0].length} columns, B has ${B.length} rows.`;
-      feedback.className = "submit-feedback error";
-      return;
-    }
-
-    // Lock UI
-    isSubmitting = true;
-    btn.classList.add("is-loading");
-    btn.disabled = true;
-    feedback.textContent = "⏳ Submitting job...";
-    feedback.className = "submit-feedback info";
-
-    try {
-      const data = await App.submitJob(A, B);
-
-      if (data && data.job_id) {
-        feedback.textContent = `✅ Job ${data.job_id.slice(0, 8)} is running. Waiting for result...`;
-        feedback.className = "submit-feedback success";
-      } else if (data && data.error) {
-        feedback.textContent = `❌ ${data.error}`;
-        feedback.className = "submit-feedback error";
-      }
-    } catch (e) {
-      feedback.textContent = `❌ Network error: ${e.message}`;
-      feedback.className = "submit-feedback error";
-    } finally {
-      isSubmitting = false;
-      btn.classList.remove("is-loading");
-      btn.disabled = false;
-    }
-  }
-
-  // Build default grids on load
-  window.addEventListener("DOMContentLoaded", () => {
-    buildGrid("A");
-    buildGrid("B");
-    syncDim();
-  });
-
-  return { syncDim, setSize, buildGrid, fillRandom, submit };
-})();
-</script>
+      return {
+        syncDim,
+        setSize,
+        markCustom,
+        buildGrid,
+        rebuild,
+        fillRandom,
+        submit,
+        uploadCsv,
+        clearUpload,
+        onDimInput,
+      };
+    })();
+  </script>
 </body>
 </html>

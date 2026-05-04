@@ -380,6 +380,16 @@ const App = (() => {
   function updateMetric(key, val) {
     const el = document.getElementById("m-" + key);
     if (el) el.textContent = val;
+    const mobileMap = {
+      compute_time: "ms-compute",
+      mflops: "ms-mflops",
+      status: "ms-status",
+    };
+    const msId = mobileMap[key];
+    if (msId) {
+      const ms = document.getElementById(msId);
+      if (ms) ms.textContent = val;
+    }
   }
 
   // ── Boot ────────────────────────────────────────────────────────────────────
