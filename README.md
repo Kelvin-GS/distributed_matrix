@@ -212,92 +212,70 @@ mDNS works natively on macOS through the built-in Bonjour service — no additio
  
 ---
  
-#### Android (Termux) — Advanced
- 
-Running a Python node directly on Android requires **Termux** (a Linux terminal emulator). This is optional — most users will run Android phones as browser-only workers (see "Adding a phone or tablet" below), which requires zero installation.
- 
-If you want your Android device to run a full Python node as a worker:
- 
+#### Android (Termux)
+
+Running a Python node directly on Android requires **Termux** (a Linux terminal emulator).
+
+The Android device will run the full Python node as a worker:
+
 **1. Install Termux**
- 
-Download from [F-Droid](https://f-droid.org/en/packages/com.termux/) (NOT Google Play — the Play Store version is outdated and broken).
- 
-**2. Install Python and dependencies**
- 
+
+Download from [F-Droid](https://f-droid.org/en/packages/com.termux/) (NOT Google Play - the Play Store version is outdated and broken).
+
+**2. Install Python and basic tools**
+
 ```bash
 pkg update && pkg upgrade
 pkg install python git
 ```
- 
+
 **3. Clone the repository**
- 
+
 ```bash
 cd ~
 git clone https://github.com/Kelvin-GS/distributed_matrix.git
 cd distributed_matrix
 ```
- 
-**4. Fix the dependency conflict**
- 
-FastAPI tries to install `orjson` (a fast JSON library) which requires Rust compilation. Rust builds fail on Termux because of Android API level detection issues. The fix: skip `orjson` and `ujson` — FastAPI falls back to Python's built-in `json` module (slightly slower but fully functional).
- 
-Create a file called `requirements-android.txt`:
- 
+
+**4. Install build tools and set the Android API level**
+
 ```bash
-cat > requirements-android.txt << 'EOF'
-fastapi==0.111.0 --no-binary orjson,ujson
-uvicorn[standard]==0.29.0
-aiohttp==3.9.5
-zeroconf==0.132.2
-websockets==12.0
-EOF
+pkg install rust
+pkg install binutils
+pkg install clang
+export ANDROID_API_LEVEL=24
 ```
- 
-Then install:
- 
+
+**5. Build and install orjson**
+
 ```bash
-pip install -r requirements-android.txt
+CARGO_BUILD_TARGET=aarch64-linux-android pip install orjson
+export RUSTC_BOOTSTRAP=1
+pip install orjson
 ```
- 
-**5. Run the node**
- 
+
+**6. Install the remaining dependencies**
+
 ```bash
-python main.py
+pip install aiohttp
+pip install uvicorn
+pip install zeroconf
+pip install fastapi
 ```
- 
-Termux nodes work identically to desktop Python nodes - they participate in mDNS discovery, receive block assignments, compute locally, and report results. The compute performance will be lower than a laptop (phones have slower CPUs) but the metrics panel proves the phone's CPU is doing real work.
- 
-**Known Termux limitations:**
- 
-- **Battery drain** — Python running in the background consumes battery quickly; keep the device plugged in during long jobs
-- **Network wakelock** — Termux may lose network access when the screen turns off; keep the screen on or use a wakelock app
-- **No firewall control** — Android does not expose port-level firewall settings; incoming connections work automatically on WiFi
- 
----
- 
-On a successful start on any platform you will see:
- 
-```
-2026-04-28 17:10:21,183 [node] INFO — Loaded persistent node_id: e802fef3
-2026-04-28 17:10:21,186 [storage] INFO — SQLite initialised at /home/kelvin/Desktop/distributed_matrix/matmul.db (WAL mode)
-2026-04-28 17:10:21,187 [main] INFO — Starting distributed matrix node on port 8080...
-2026-04-28 17:10:21,187 [node] INFO — Node e802fef3 starting on 192.168.0.108:8080
-2026-04-28 17:10:21,647 [discovery] INFO — Registered mDNS service: e802fef3-a299-49b8-8953-84e422c9eac2._matmul._tcp.local. (port 8080)
-2026-04-28 17:10:21,647 [discovery] INFO — Discovery started. Local IP: 192.168.0.108, port: 8080
-2026-04-28 17:10:21,670 [node] INFO — Web UI at http://192.168.0.108:8080
-```
- 
-The IP address shown is what other devices use to reach this node. Every device running the system is also serving the web interface on that address.
- 
-To run multiple nodes on the same machine (useful for local testing), open a separate terminal for each and specify different ports:
- 
+
+**7. Run the node**
+
 ```bash
-python main.py --port 8080
-python main.py --port 8081
-python main.py --port 8082
+python3 main.py
 ```
- 
----
+
+Termux nodes participate in mDNS discovery, receive block assignments, compute locally, and report results like desktop Python nodes. Performance will be lower than on a laptop, but the metrics panel still proves the phone’s CPU is doing real work.
+
+#### Known Termux limitations:
+
+Battery drain is significant - keep the device plugged in during long jobs
+Network access may degrade when the screen turns off - keep the screen on or use a wakelock app
+Android does not expose simple port-level firewall controls, so incoming connections on Wi-Fi are usually handled automatically
  
 ## Adding Devices
  
@@ -312,27 +290,8 @@ python3 main.py
 # Windows
 python main.py
 ```
- 
+For a new Termux - android node, follow the steps above under the Android setup.
 The new node is discovered automatically within ~500ms. No configuration changes are needed on any existing node.
-
-## Adding a phone or tablet
-
-Both Android and iPhone work as browser worker nodes — no installation required on either platform.
-
-1. Connect the device to the same WiFi network
-2. Open any Python node's IP address in the browser: `http://192.168.x.x:8080`
-3. **The device registers itself as a worker node immediately**
-
-The phone receives block assignments via WebSocket, computes them using a
-JavaScript Web Worker (a real background CPU thread), and returns results
-with timing metrics. The metrics panel on the phone confirms its CPU did
-the work.
-
-**Android:** Use Chrome or Firefox.
-**iPhone:** Use Safari (iOS 15+).
-
-> To run a full Python node on Android instead of a browser worker,
-> follow the Termux steps in the Installation section.
 
 ---
 
