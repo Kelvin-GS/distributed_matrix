@@ -7,7 +7,7 @@
   <meta name="description" content="Distributed matrix multiplication across phones and desktops on a local network.">
   <link rel="manifest" href="/static/manifest.json">
   <title>Distributed Matrix System</title>
-  <link rel="stylesheet" href="/static/style.css?v=2">
+  <link rel="stylesheet" href="/static/style.css?v=4">
 </head>
 <body>
   <div id="app" class="app-shell">
@@ -30,10 +30,25 @@
       </div>
     </header>
 
+    <section class="mobile-summary" aria-label="Your contribution">
+      <div class="ms-chip">
+        <span class="ms-label">Status</span>
+        <span class="ms-value" id="ms-status">Idle</span>
+      </div>
+      <div class="ms-chip">
+        <span class="ms-label">Compute</span>
+        <span class="ms-value" id="ms-compute">— ms</span>
+      </div>
+      <div class="ms-chip">
+        <span class="ms-label">MFLOPS</span>
+        <span class="ms-value" id="ms-mflops">—</span>
+      </div>
+    </section>
+
     <section class="hero-strip" aria-label="Overview">
       <div class="hero-copy">
-        <h1>Matrix Multiply</h1>
-        <p>Your network does the heavy lifting — every device contributes</p>
+        <h1>Matrix Multiplication</h1>
+        <p>Every connected device contributes contributes it  part to the math!</p>
       </div>
       <div class="hero-stats">
         <div class="stat">
@@ -53,14 +68,15 @@
 
     <main class="body">
       <section class="left-column">
+        <div class="left-stack">
         <div class="sect-label">Size presets</div>
         <div class="preset-row" id="preset-row">
-          <button type="button" class="preset-btn active" data-size="2x2" onclick="UI.setSize(2, 2)">2×2</button>
-          <button type="button" class="preset-btn" data-size="3x3" onclick="UI.setSize(3, 3)">3×3</button>
-          <button type="button" class="preset-btn" data-size="4x4" onclick="UI.setSize(4, 4)">4×4</button>
-          <button type="button" class="preset-btn" data-size="10x10" onclick="UI.setSize(10, 10)">10×10</button>
-          <button type="button" class="preset-btn" data-size="50x50" onclick="UI.setSize(50, 50)">50×50</button>
-          <button type="button" class="preset-btn" data-size="100x100" onclick="UI.setSize(100, 100)">100×100</button>
+          <button type="button" class="preset-btn active" data-size="2x2" onclick="UI.setSize(2, 2)">2<span class="x">×</span>2</button>
+          <button type="button" class="preset-btn" data-size="3x3" onclick="UI.setSize(3, 3)">3<span class="x">×</span>3</button>
+          <button type="button" class="preset-btn" data-size="4x4" onclick="UI.setSize(4, 4)">4<span class="x">×</span>4</button>
+          <button type="button" class="preset-btn" data-size="10x10" onclick="UI.setSize(10, 10)">10<span class="x">×</span>10</button>
+          <button type="button" class="preset-btn" data-size="50x50" onclick="UI.setSize(50, 50)">50<span class="x">×</span>50</button>
+          <button type="button" class="preset-btn" data-size="100x100" onclick="UI.setSize(100, 100)">100<span class="x">×</span>100</button>
           <button type="button" class="preset-btn" data-size="custom" onclick="UI.markCustom()">Custom</button>
         </div>
 
@@ -74,10 +90,16 @@
               </div>
               <div class="matrix-controls">
                 <label class="sr-only" for="rowsA">Rows A</label>
-                <input type="number" id="rowsA" class="dim-input" value="2" min="2" max="200" oninput="UI.markCustom(); UI.rebuild('A');">
+                <input type="number" id="rowsA" class="dim-input" value="2" min="2" max="500" oninput="UI.onDimInput('rowsA');">
                 <span class="dim-sep">×</span>
                 <label class="sr-only" for="colsA">Cols A</label>
-                <input type="number" id="colsA" class="dim-input" value="2" min="2" max="200" oninput="UI.markCustom(); UI.syncDim(); UI.rebuild('A');">
+                <input type="number" id="colsA" class="dim-input" value="2" min="2" max="500" oninput="UI.onDimInput('colsA');">
+              </div>
+              <div class="upload-row">
+                <input type="file" id="file-upload-A" class="sr-only" accept=".csv,text/csv" onchange="UI.uploadCsv('A', this)">
+                <label class="upload-btn" for="file-upload-A">Upload CSV</label>
+                <span class="upload-status" id="upload-status-A"></span>
+                <button type="button" class="upload-clear" onclick="UI.clearUpload('A')">Clear</button>
               </div>
               <div id="grid-A" class="mgrid mgrid-2"></div>
             </div>
@@ -91,10 +113,16 @@
               </div>
               <div class="matrix-controls">
                 <label class="sr-only" for="rowsB">Rows B</label>
-                <input type="number" id="rowsB" class="dim-input" value="2" min="2" max="200" readonly>
+                <input type="number" id="rowsB" class="dim-input" value="2" min="2" max="500" readonly>
                 <span class="dim-sep">×</span>
                 <label class="sr-only" for="colsB">Cols B</label>
-                <input type="number" id="colsB" class="dim-input" value="2" min="2" max="200" oninput="UI.markCustom(); UI.rebuild('B')">
+                <input type="number" id="colsB" class="dim-input" value="2" min="2" max="500" oninput="UI.onDimInput('colsB');">
+              </div>
+              <div class="upload-row">
+                <input type="file" id="file-upload-B" class="sr-only" accept=".csv,text/csv" onchange="UI.uploadCsv('B', this)">
+                <label class="upload-btn" for="file-upload-B">Upload CSV</label>
+                <span class="upload-status" id="upload-status-B"></span>
+                <button type="button" class="upload-clear" onclick="UI.clearUpload('B')">Clear</button>
               </div>
               <div id="grid-B" class="mgrid mgrid-2"></div>
             </div>
@@ -104,7 +132,9 @@
             <button type="button" class="aux-btn" onclick="UI.fillRandom()">🎲 Fill Random</button>
           </div>
 
-          <button id="btn-run" type="button" class="run-btn" onclick="UI.submit()">Run Distributed Multiply</button>
+          <div class="run-btn-row">
+            <button id="btn-run" type="button" class="run-btn" onclick="UI.submit()">Run Distributed Multiply</button>
+          </div>
           <div id="submit-feedback" class="submit-feedback"></div>
         </section>
 
@@ -119,6 +149,7 @@
           <div class="sect-label">Node log</div>
           <div id="log" class="log-area">Waiting for connection...</div>
         </section>
+        </div>
       </section>
 
       <aside class="right-panel">
@@ -248,7 +279,7 @@
       }
     })();
   </script>
-  <script src="/static/app.js?v=2"></script>
+  <script src="/static/app.js?v=4"></script>
   <script>
     if (typeof App !== "undefined") {
       window.App = App;
@@ -267,6 +298,9 @@
       ]);
 
       let isSubmitting = false;
+      const uploaded = { A: null, B: null };
+      const MIN_DIM = 2;
+      const MAX_DIM = 500;
 
       function escapeHtml(value) {
         return String(value)
@@ -286,6 +320,122 @@
 
       function markCustom() {
         setActivePreset("custom");
+      }
+
+      function clearUploadedAll() {
+        uploaded.A = null;
+        uploaded.B = null;
+        clearUploadRow("A");
+        clearUploadRow("B");
+      }
+
+      function clearUploadRow(id) {
+        const inp = document.getElementById(`file-upload-${id}`);
+        if (inp) inp.value = "";
+        const st = document.getElementById(`upload-status-${id}`);
+        if (st) st.textContent = "";
+      }
+
+      function parseCsvText(text) {
+        const lines = text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0);
+        if (!lines.length) throw new Error("CSV is empty.");
+        const matrix = [];
+        let cols = null;
+        for (let i = 0; i < lines.length; i++) {
+          const parts = lines[i].split(",").map((p) => p.trim());
+          if (cols === null) cols = parts.length;
+          else if (parts.length !== cols) {
+            throw new Error(`Row ${i + 1} has ${parts.length} columns; expected ${cols}.`);
+          }
+          const row = [];
+          for (let j = 0; j < parts.length; j++) {
+            const v = parseFloat(parts[j]);
+            if (!Number.isFinite(v)) throw new Error(`Invalid number at row ${i + 1}, col ${j + 1}.`);
+            row.push(v);
+          }
+          matrix.push(row);
+        }
+        const rows = matrix.length;
+        if (rows < MIN_DIM || rows > MAX_DIM) throw new Error(`Row count ${rows} must be between ${MIN_DIM} and ${MAX_DIM}.`);
+        if (cols < MIN_DIM || cols > MAX_DIM) throw new Error(`Column count ${cols} must be between ${MIN_DIM} and ${MAX_DIM}.`);
+        return matrix;
+      }
+
+      function uploadCsv(id, inputEl) {
+        const file = inputEl.files && inputEl.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function () {
+          try {
+            const matrix = parseCsvText(String(reader.result || ""));
+            const parsedRows = matrix.length;
+            const parsedCols = matrix[0].length;
+
+            if (id === "A" && uploaded.B) {
+              if (parsedCols !== uploaded.B.length) {
+                setFeedback(
+                  `A has ${parsedCols} columns but uploaded B has ${uploaded.B.length} rows. cols(A) must equal rows(B). Clear B or upload a matching A.`,
+                  "error"
+                );
+                inputEl.value = "";
+                return;
+              }
+            }
+            if (id === "B") {
+              const colsA = uploaded.A ? uploaded.A[0].length : (parseInt(document.getElementById("colsA").value, 10) || 2);
+              if (parsedRows !== colsA) {
+                setFeedback(
+                  `B has ${parsedRows} rows but A has ${colsA} columns. cols(A) must equal rows(B). Adjust A first or upload a matching B.`,
+                  "error"
+                );
+                inputEl.value = "";
+                return;
+              }
+            }
+
+            uploaded[id] = matrix;
+            document.getElementById(`rows${id}`).value = String(parsedRows);
+            document.getElementById(`cols${id}`).value = String(parsedCols);
+            if (id === "A") {
+              syncDim();
+              rebuild("A");
+            } else {
+              rebuild("B");
+            }
+            updateDimTags();
+            const st = document.getElementById(`upload-status-${id}`);
+            if (st) st.textContent = `Loaded ${parsedRows}×${parsedCols} from ${file.name}`;
+            clearFeedback();
+          } catch (e) {
+            setFeedback(`CSV (${id}): ${e.message}`, "error");
+            inputEl.value = "";
+          }
+        };
+        reader.onerror = function () {
+          setFeedback(`Could not read file for matrix ${id}.`, "error");
+          inputEl.value = "";
+        };
+        reader.readAsText(file);
+      }
+
+      function clearUpload(id) {
+        uploaded[id] = null;
+        clearUploadRow(id);
+        rebuild(id);
+        updateDimTags();
+      }
+
+      function onDimInput(which) {
+        clearUploadedAll();
+        markCustom();
+        if (which === "rowsA") {
+          rebuild("A");
+        } else if (which === "colsA") {
+          syncDim();
+          rebuild("A");
+        } else if (which === "colsB") {
+          rebuild("B");
+        }
       }
 
       function updateDimTags() {
@@ -317,6 +467,7 @@
       }
 
       function setSize(rows, cols) {
+        clearUploadedAll();
         document.getElementById("rowsA").value = rows;
         document.getElementById("colsA").value = cols;
         document.getElementById("rowsB").value = cols;
@@ -344,7 +495,7 @@
         updateGridClass(id, rows, cols);
 
         if (rows > 15 || cols > 15) {
-          container.innerHTML = `<p class="grid-note">Grid hidden for large matrices — values auto-generated on submit.</p>`;
+          container.innerHTML = `<p class="grid-note">Grid hidden for large matrices — use <strong>Upload CSV</strong> above, or values are auto-generated on submit if no CSV is loaded.</p>`;
           return;
         }
 
@@ -385,6 +536,7 @@
       }
 
       function fillRandom() {
+        clearUploadedAll();
         ["A", "B"].forEach((id) => {
           const inputs = document.querySelectorAll(`#grid-${id} input`);
           inputs.forEach((input) => {
@@ -509,13 +661,23 @@
           document.getElementById("rowsB").value = colsA;
         }
 
-        let A = getMatrix("A");
-        let B = getMatrix("B");
+        let A = uploaded.A || getMatrix("A");
+        let B = uploaded.B || getMatrix("B");
         if (!A) A = randomMatrix(rowsA, colsA);
         if (!B) B = randomMatrix(rowsB, colsB);
 
+        if (uploaded.A) {
+          document.getElementById("rowsA").value = String(A.length);
+          document.getElementById("colsA").value = String(A[0].length);
+          document.getElementById("rowsB").value = String(A[0].length);
+        }
+        if (uploaded.B) {
+          document.getElementById("rowsB").value = String(B.length);
+          document.getElementById("colsB").value = String(B[0].length);
+        }
+
         if (A[0].length !== B.length) {
-          setFeedback(`❌ Dimension mismatch: A has ${A[0].length} columns, B has ${B.length} rows.`, "error");
+          setFeedback(`Dimension mismatch: A has ${A[0].length} columns, B has ${B.length} rows. cols(A) must equal rows(B).`, "error");
           updateProgress(0, "Dimension mismatch");
           return;
         }
@@ -582,6 +744,9 @@
         rebuild,
         fillRandom,
         submit,
+        uploadCsv,
+        clearUpload,
+        onDimInput,
       };
     })();
   </script>
