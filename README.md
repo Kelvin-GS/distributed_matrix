@@ -243,12 +243,12 @@ cd distributed_matrix
 pkg install rust
 pkg install binutils
 pkg install clang
-export ANDROID_API_LEVEL=24
 ```
 
 **5. Build and install orjson**
 
 ```bash
+export ANDROID_API_LEVEL=24
 CARGO_BUILD_TARGET=aarch64-linux-android pip install orjson
 export RUSTC_BOOTSTRAP=1
 pip install orjson
